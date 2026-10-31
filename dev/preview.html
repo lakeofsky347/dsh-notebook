@@ -1,19 +1,50 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-Hans">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>dsh-notebook panel preview (dev only)</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dsh-notebook panel preview</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #050506; }
-    #host { height: 100%; }
+    html, body, #app { margin: 0; height: 100%; background: #050506; }
+    body { display: flex; flex-direction: column; }
+    .devbar {
+      flex: none;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      background: #161618;
+      color: #d6d6dc;
+      font: 12px/1.4 ui-monospace, monospace;
+    }
+    .devbar a { color: #9eb6ff; }
+    body.clean .devbar { display: none; }
+    #app { flex: 1; min-height: 0; }
+    .host-button {
+      background: #5c2b2b;
+      color: #fff;
+      border: 3px solid #ffd36a;
+      padding: 4px 8px;
+    }
   </style>
 </head>
 <body>
-  <div id="host"></div>
-  <!-- Dev-only harness. Not part of the plugin bundle (package.json "files" excludes dev/). -->
-  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-  <script src="./boot.js"></script>
+  <!-- Dev-only harness. Not injected by the plugin and not listed in package.json "files". -->
+  <div class="devbar">
+    <span>dev preview</span>
+    <a href="?scene=ready">ready</a>
+    <a href="?scene=empty">empty</a>
+    <a href="?scene=fresh">unbound</a>
+    <a href="?scene=error">error</a>
+    <a href="?scene=loading">loading</a>
+    <a href="?scene=ready&amp;act=ask">ask</a>
+    <a href="?scene=ready&amp;act=add">add</a>
+    <a href="?scene=ready&amp;act=artifact">artifact</a>
+    <button class="host-button" type="button">host button</button>
+  </div>
+  <div id="app"></div>
+  <script src="harness.js"></script>
+  <script src="../src/client.js"></script>
+  <script src="boot.js"></script>
 </body>
 </html>
