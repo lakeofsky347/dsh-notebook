@@ -3,14 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Profile-scoped source notebook for DeepSeek Harness: retrieval, citations, and text studio artifacts.",
+  "description": "DeepSeek Harness notebook workbench: model conversations, resource collection, sources, and Studio artifacts.",
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
     "./client": "./src/client.js",
     "./library": "./src/library.js"
   },
-  "files": ["src", "cordis.patch.yml", "package.json"],
+  "files": [
+    "src",
+    "cordis.patch.yml",
+    "package.json",
+    "README.md"
+  ],
   "engines": {
     "node": ">=24.9.0",
     "dsh": ">=0.2.1-rc.5 <0.3.0"
@@ -27,7 +32,9 @@
     "@deepseek-ai/schemastery": "*"
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [
@@ -37,5 +44,13 @@
       ]
     }
   },
-  "scripts": { "test": "node --test test/*.test.js" }
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "dev": "node dev/serve.mjs",
+    "test:ui": "node dev/check.mjs",
+    "preview:particles": "node dev/record-particles.mjs"
+  },
+  "dependencies": {
+    "linkedom": "0.18.14"
+  }
 }

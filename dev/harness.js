@@ -57,6 +57,13 @@
     return [slot.state, setState]
   }
 
+  function useRef(initialValue) {
+    const fiber = wip
+    const index = hookIndex++
+    if (fiber.hooks.length <= index) fiber.hooks.push({ current: initialValue })
+    return fiber.hooks[index]
+  }
+
   function useEffect(fn, deps) {
     const fiber = wip
     const index = hookIndex++
@@ -142,6 +149,7 @@
     }
     dom.__propNames = names
     if (!props) return
+    if (props.ref && typeof props.ref === 'object') props.ref.current = dom
     if (props.className != null && props.className !== false) dom.setAttribute('class', props.className)
     else dom.removeAttribute('class')
     dom.removeAttribute('style')
@@ -288,7 +296,7 @@
     flush(root)
   }
 
-  window.React = { createElement: h, useState, useEffect }
+  window.React = { createElement: h, useState, useEffect, useRef }
   window.ReactDOM = { render }
   window.__plugins = []
   window.__ModuleLoader__ = {

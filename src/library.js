@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { assertText, chunkText, hashText, isTextPath, rankChunks, wordCount } from './text.js'
+import { extractUrlDocument } from './url-text.js'
 
 export const SOURCE_KINDS = ['file', 'text', 'url', 'note']
 export const ARTIFACT_KINDS = ['report', 'study-guide', 'briefing', 'flashcards', 'quiz', 'mind-map', 'data-table']
@@ -56,9 +57,32 @@ const SCHEMA = [
     session_id TEXT PRIMARY KEY,
     notebook_id TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS workspace_messages (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'tool', 'system')),
+    text TEXT NOT NULL,
+    content TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    status TEXT NOT NULL,
+    tool_name TEXT NOT NULL,
+    metadata TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
   'CREATE INDEX IF NOT EXISTS sources_notebook ON sources (notebook_id)',
   'CREATE INDEX IF NOT EXISTS chunks_source ON chunks (source_id)',
   'CREATE INDEX IF NOT EXISTS artifacts_notebook ON artifacts (notebook_id)',
+  'CREATE INDEX IF NOT EXISTS messages_workspace ON workspace_messages (workspace_id, created_at)',
 ].join(';\n')
 
 function fail(message) {
@@ -71,6 +95,55 @@ function missing(message) {
   const error = new Error(message)
   error.code = 'notebook/not-found'
   return error
+}
+
+function jsonValue(value, field, fallback) {
+  try {
+    const encoded = JSON.stringify(value === undefined ? fallback : value)
+    if (encoded === undefined) throw new Error()
+    return encoded
+  } catch {
+    throw fail(field + ' must be JSON serializable')
+  }
+}
+
+async function readBoundedResponse(response, maxBytes, controller) {
+  const declaredSize = response.headers.get('content-length')
+  if (declaredSize !== null && /^\d+$/.test(declaredSize) && Number(declaredSize) > maxBytes) {
+    controller.abort()
+    throw fail('url exceeds the download limit')
+  }
+  const chunks = []
+  let size = 0
+  function accept(value) {
+    size += typeof value === 'string' ? Buffer.byteLength(value) : value.byteLength
+    if (size > maxBytes) {
+      controller.abort()
+      throw fail('url exceeds the download limit')
+    }
+    chunks.push(Buffer.from(value))
+  }
+  if (response.body?.getReader) {
+    const reader = response.body.getReader()
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        accept(value)
+      }
+    } catch (error) {
+      try { await reader.cancel() } catch {}
+      throw error
+    } finally {
+      reader.releaseLock()
+    }
+  } else if (response.body?.[Symbol.asyncIterator]) {
+    for await (const value of response.body) accept(value)
+  } else {
+    // Test doubles and older fetch implementations may only expose arrayBuffer.
+    accept(await response.arrayBuffer())
+  }
+  return Buffer.concat(chunks, size)
 }
 
 export function openLibrary(file, limits, deps = {}) {
@@ -95,10 +168,12 @@ export function openLibrary(file, limits, deps = {}) {
     insert: db.prepare('INSERT INTO sources (id, notebook_id, kind, title, locator, body, enabled, label, status, content_hash, word_count, error, mtime_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
     list: db.prepare('SELECT id, notebook_id, kind, title, locator, enabled, label, status, content_hash, word_count, error, mtime_ms, created_at FROM sources WHERE notebook_id = ? ORDER BY created_at ASC'),
     get: db.prepare('SELECT * FROM sources WHERE id = ?'),
-    byNotebook: db.prepare('SELECT * FROM sources WHERE notebook_id = ?'),
+    byNotebook: db.prepare('SELECT * FROM sources WHERE notebook_id = ? ORDER BY created_at ASC, rowid ASC'),
     updateBody: db.prepare('UPDATE sources SET body = ?, status = ?, content_hash = ?, word_count = ?, error = ?, mtime_ms = ?, title = ? WHERE id = ?'),
     setEnabled: db.prepare('UPDATE sources SET enabled = ? WHERE id = ? AND notebook_id = ?'),
     setStatus: db.prepare('UPDATE sources SET status = ?, error = ? WHERE id = ?'),
+    rename: db.prepare('UPDATE sources SET title = ? WHERE id = ?'),
+    del: db.prepare('DELETE FROM sources WHERE id = ?'),
   }
   const chunkStmt = {
     insert: db.prepare('INSERT INTO chunks (id, source_id, ordinal, text, locator) VALUES (?, ?, ?, ?, ?)'),
@@ -117,11 +192,77 @@ export function openLibrary(file, limits, deps = {}) {
     get: db.prepare('SELECT notebook_id FROM bindings WHERE session_id = ?'),
     sessions: db.prepare('SELECT session_id FROM bindings WHERE notebook_id = ?'),
   }
+  const workspaceStmt = {
+    insert: db.prepare('INSERT INTO workspaces (id, title, provider, model, mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'),
+    list: db.prepare('SELECT * FROM workspaces ORDER BY updated_at DESC, rowid DESC'),
+    get: db.prepare('SELECT * FROM workspaces WHERE id = ?'),
+    update: db.prepare('UPDATE workspaces SET title = ?, provider = ?, model = ?, mode = ?, updated_at = ? WHERE id = ?'),
+    touch: db.prepare('UPDATE workspaces SET updated_at = ? WHERE id = ?'),
+  }
+  const messageStmt = {
+    insert: db.prepare('INSERT INTO workspace_messages (id, workspace_id, role, text, content, provider, model, status, tool_name, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
+    get: db.prepare('SELECT * FROM workspace_messages WHERE id = ?'),
+    list: db.prepare('SELECT * FROM workspace_messages WHERE workspace_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?'),
+    update: db.prepare('UPDATE workspace_messages SET text = ?, content = ?, status = ?, metadata = ? WHERE id = ?'),
+  }
+
+  function transaction(work) {
+    db.exec('BEGIN')
+    try {
+      const result = work()
+      db.exec('COMMIT')
+      return result
+    } catch (error) {
+      db.exec('ROLLBACK')
+      throw error
+    }
+  }
 
   function requireNotebook(id) {
     const row = notebookStmt.get.get(id)
     if (!row) throw missing('notebook not found: ' + id)
     return row
+  }
+
+  function requireWorkspace(id) {
+    const row = workspaceStmt.get.get(id)
+    if (!row) throw missing('workspace not found: ' + id)
+    return row
+  }
+
+  function requireSource(notebookId, id) {
+    const row = sourceStmt.get.get(id)
+    if (!row || row.notebook_id !== notebookId) throw missing('source not found: ' + id)
+    return row
+  }
+
+  function publicWorkspace(row) {
+    return {
+      id: row.id,
+      title: row.title,
+      provider: row.provider,
+      model: row.model,
+      mode: row.mode,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      notebookId: bindingStmt.get.get('workbench:' + row.id)?.notebook_id ?? null,
+    }
+  }
+
+  function publicMessage(row) {
+    return {
+      id: row.id,
+      workspaceId: row.workspace_id,
+      role: row.role,
+      text: row.text,
+      content: JSON.parse(row.content),
+      provider: row.provider,
+      model: row.model,
+      status: row.status,
+      toolName: row.tool_name,
+      metadata: JSON.parse(row.metadata),
+      createdAt: row.created_at,
+    }
   }
 
   function replaceChunks(sourceId, pieces) {
@@ -185,7 +326,7 @@ export function openLibrary(file, limits, deps = {}) {
   }
 
   function refreshFile(row) {
-    if (row.kind !== 'file' || row.status === 'error') return row
+    if (row.kind !== 'file') return row
     let info
     try {
       info = stat(row.locator)
@@ -195,6 +336,10 @@ export function openLibrary(file, limits, deps = {}) {
     }
     if (!info.isFile()) {
       sourceStmt.setStatus.run('inactive', 'path is not a file', row.id)
+      return sourceStmt.get.get(row.id)
+    }
+    if (info.size > limits.maxUploadBytes) {
+      sourceStmt.setStatus.run('error', 'updated file exceeds the source limit', row.id)
       return sourceStmt.get.get(row.id)
     }
     if (info.mtimeMs === row.mtime_ms && row.status === 'ready') return row
@@ -230,6 +375,68 @@ export function openLibrary(file, limits, deps = {}) {
 
   return {
     file,
+    createWorkspace({ title = '新对话', provider = '', model = '', mode = 'research' } = {}) {
+      const name = String(title).trim()
+      if (name === '') throw fail('title is required')
+      const id = randomUUID()
+      const now = Date.now()
+      workspaceStmt.insert.run(id, name, String(provider), String(model), String(mode), now, now)
+      return publicWorkspace(workspaceStmt.get.get(id))
+    },
+    listWorkspaces() {
+      return workspaceStmt.list.all().map(publicWorkspace)
+    },
+    getWorkspace(id) {
+      const row = workspaceStmt.get.get(id)
+      return row ? publicWorkspace(row) : null
+    },
+    updateWorkspace(id, patch) {
+      const row = requireWorkspace(id)
+      const title = patch.title === undefined ? row.title : String(patch.title).trim()
+      if (title === '') throw fail('title is required')
+      const provider = patch.provider === undefined ? row.provider : String(patch.provider)
+      const model = patch.model === undefined ? row.model : String(patch.model)
+      const mode = patch.mode === undefined ? row.mode : String(patch.mode)
+      workspaceStmt.update.run(title, provider, model, mode, Date.now(), id)
+      return publicWorkspace(workspaceStmt.get.get(id))
+    },
+    appendMessage(workspaceId, { role, text = '', content, provider = '', model = '', status = 'done', toolName = '', metadata } = {}) {
+      requireWorkspace(workspaceId)
+      if (!['user', 'assistant', 'tool', 'system'].includes(role)) throw fail('unknown message role')
+      const body = String(text)
+      const blocks = content === undefined ? (body ? [{ type: 'text', text: body }] : []) : content
+      if (!Array.isArray(blocks)) throw fail('content must be an array')
+      const contentJson = jsonValue(blocks, 'content', [])
+      const metadataJson = jsonValue(metadata, 'metadata', {})
+      const id = randomUUID()
+      const now = Date.now()
+      transaction(() => {
+        messageStmt.insert.run(id, workspaceId, role, body, contentJson, String(provider), String(model), String(status), String(toolName), metadataJson, now)
+        workspaceStmt.touch.run(now, workspaceId)
+      })
+      return publicMessage(messageStmt.get.get(id))
+    },
+    updateMessage(id, patch) {
+      const row = messageStmt.get.get(id)
+      if (!row) throw missing('message not found: ' + id)
+      requireWorkspace(row.workspace_id)
+      if (patch.content !== undefined && !Array.isArray(patch.content)) throw fail('content must be an array')
+      const text = patch.text === undefined ? row.text : String(patch.text)
+      const content = patch.content === undefined ? row.content : jsonValue(patch.content, 'content', [])
+      const status = patch.status === undefined ? row.status : String(patch.status)
+      const metadata = patch.metadata === undefined ? row.metadata : jsonValue(patch.metadata, 'metadata', {})
+      transaction(() => {
+        messageStmt.update.run(text, content, status, metadata, id)
+        workspaceStmt.touch.run(Date.now(), row.workspace_id)
+      })
+      return publicMessage(messageStmt.get.get(id))
+    },
+    listMessages(workspaceId, limit = 100) {
+      requireWorkspace(workspaceId)
+      const count = Number(limit)
+      if (!Number.isSafeInteger(count) || count < 0) throw fail('message limit must be a non-negative integer')
+      return messageStmt.list.all(workspaceId, count).reverse().map(publicMessage)
+    },
     createNotebook({ title, instructions = '', style = 'default', grounding = 'sources-only' }) {
       if (notebookStmt.count.get().n >= limits.maxNotebooks) throw fail('notebook limit reached')
       const name = String(title ?? '').trim()
@@ -274,6 +481,7 @@ export function openLibrary(file, limits, deps = {}) {
       let info
       try { info = stat(path) } catch { throw fail('file is not readable') }
       if (!info.isFile()) throw fail('path is not a file')
+      if (info.size > limits.maxUploadBytes) throw fail('source exceeds byte limit')
       let body
       try {
         body = readFile(path).toString('utf8')
@@ -298,12 +506,12 @@ export function openLibrary(file, limits, deps = {}) {
         if (type !== '' && !/^text\//.test(type) && !type.includes('json') && !type.includes('xml')) {
           throw fail('url is not a text document')
         }
-        const bytes = Buffer.from(await response.arrayBuffer())
-        if (bytes.length > limits.maxUrlBytes) throw fail('url exceeds the download limit')
-        const body = bytes.toString('utf8')
-        assertText(body)
+        const bytes = await readBoundedResponse(response, limits.maxUrlBytes, controller)
+        const raw = bytes.toString('utf8')
+        assertText(raw)
+        const { body, title } = extractUrlDocument(raw, type, parsed.href)
         if (body.trim() === '') throw fail('url document is empty')
-        return storeBody(notebookId, { kind: 'url', title: parsed.hostname + parsed.pathname, body, locator: parsed.href })
+        return storeBody(notebookId, { kind: 'url', title, body, locator: parsed.href })
       } catch (error) {
         if (error.code === 'notebook/rejected') throw error
         throw fail(error.name === 'AbortError' ? 'url timed out' : (error.message || 'url fetch failed'))
@@ -321,6 +529,7 @@ export function openLibrary(file, limits, deps = {}) {
         if (!existing || existing.notebook_id !== notebookId || existing.kind !== 'note') throw missing('note not found')
         const words = wordCount(text)
         if (words > limits.maxWordsPerSource) throw fail('source exceeds word limit')
+        if (Buffer.byteLength(text) > limits.maxUploadBytes) throw fail('source exceeds byte limit')
         const hash = hashText(text)
         db.exec('BEGIN')
         try {
@@ -339,6 +548,34 @@ export function openLibrary(file, limits, deps = {}) {
     listSources(notebookId) {
       requireNotebook(notebookId)
       return sourceStmt.byNotebook.all(notebookId).map(row => publicSource(refreshFile(row)))
+    },
+    getSource(notebookId, sourceId) {
+      requireNotebook(notebookId)
+      const row = sourceStmt.get.get(sourceId)
+      if (!row || row.notebook_id !== notebookId) return null
+      const fresh = refreshFile(row)
+      return { ...publicSource(fresh), body: fresh.body }
+    },
+    renameSource(notebookId, id, title) {
+      requireNotebook(notebookId)
+      requireSource(notebookId, id)
+      const name = String(title ?? '').trim()
+      if (name === '') throw fail('title is required')
+      transaction(() => {
+        sourceStmt.rename.run(name, id)
+        notebookStmt.touch.run(Date.now(), notebookId)
+      })
+      return publicSource(sourceStmt.get.get(id))
+    },
+    deleteSource(notebookId, id) {
+      requireNotebook(notebookId)
+      requireSource(notebookId, id)
+      transaction(() => {
+        chunkStmt.del.run(id)
+        sourceStmt.del.run(id)
+        notebookStmt.touch.run(Date.now(), notebookId)
+      })
+      return { id, notebookId, deleted: true }
     },
     setSources(notebookId, changes) {
       requireNotebook(notebookId)
@@ -360,6 +597,29 @@ export function openLibrary(file, limits, deps = {}) {
         }
       }
       return rankChunks(chunks, query, topK)
+    },
+    overview(notebookId, limit = limits.topK) {
+      requireNotebook(notebookId)
+      const count = Number(limit)
+      if (!Number.isSafeInteger(count) || count < 0) throw fail('overview limit must be a non-negative integer')
+      if (count === 0) return []
+      const sources = sourceStmt.byNotebook.all(notebookId)
+        .map(refreshFile)
+        .filter(row => row.enabled === 1 && row.status === 'ready')
+        .map(row => ({ row, chunks: chunkStmt.forSource.all(row.id) }))
+      const passages = []
+      for (let ordinal = 0; passages.length < count; ordinal += 1) {
+        let found = false
+        for (const { row, chunks } of sources) {
+          const chunk = chunks[ordinal]
+          if (!chunk) continue
+          found = true
+          passages.push({ sourceId: row.id, title: row.title, ordinal: chunk.ordinal, text: chunk.text, locator: chunk.locator })
+          if (passages.length === count) break
+        }
+        if (!found) break
+      }
+      return passages
     },
     sourceRevision(notebookId) {
       requireNotebook(notebookId)

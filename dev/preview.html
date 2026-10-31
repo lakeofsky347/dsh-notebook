@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>dsh-notebook panel preview</title>
+  <title>Notebook · 开发预览（模拟数据）</title>
   <style>
     html, body, #app { margin: 0; height: 100%; background: #050506; }
     body { display: flex; flex-direction: column; }
@@ -12,6 +12,7 @@
       display: flex;
       gap: 10px;
       align-items: center;
+      flex-wrap: wrap;
       padding: 8px 12px;
       background: #161618;
       color: #d6d6dc;
@@ -31,15 +32,16 @@
 <body>
   <!-- Dev-only harness. Not injected by the plugin and not listed in package.json "files". -->
   <div class="devbar">
-    <span>dev preview</span>
-    <a href="?scene=ready">ready</a>
-    <a href="?scene=empty">empty</a>
-    <a href="?scene=fresh">unbound</a>
-    <a href="?scene=error">error</a>
-    <a href="?scene=loading">loading</a>
-    <a href="?scene=ready&amp;act=ask">ask</a>
-    <a href="?scene=ready&amp;act=add">add</a>
-    <a href="?scene=ready&amp;act=artifact">artifact</a>
+    <span>开发预览 · 模拟数据 / 无模型调用</span>
+    <a href="?scene=ready">工作台</a>
+    <a href="?scene=empty">空来源</a>
+    <a href="?scene=fresh">首次使用</a>
+    <a href="?scene=nosession">无宿主会话</a>
+    <a href="?scene=empty-models">无模型</a>
+    <a href="?scene=chat-error">模拟失败</a>
+    <a href="?scene=slow">取消任务</a>
+    <a href="?scene=error">接口错误</a>
+    <a href="?scene=loading">加载中</a>
     <button class="host-button" type="button">host button</button>
   </div>
   <div id="app"></div>

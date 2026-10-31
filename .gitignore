@@ -1,0 +1,7 @@
+node_modules/
+.local/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+artifacts/
+output/
