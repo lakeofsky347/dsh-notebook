@@ -7,8 +7,9 @@ const userMessage = ({ content, source }) => Object.freeze({ id: randomUUID(), r
 
 /** An owned native DSH Agent per workbench; SQLite contains only its UI projection. */
 export function createWorkbench(ctx, library, options) {
-  const { resolveRoute, setupAgent, onNotebookChange, maxSteps = 24, timeoutMs = 180000, maxTokens = 8192 } = options
-  for (const [name, value] of Object.entries({ maxSteps, timeoutMs, maxTokens })) {
+  const { resolveRoute, setupAgent, onNotebookChange, maxSteps = 24, timeoutMs = 180000, maxTokens = 8192,
+    researchTimeoutMs = 900000, researchMaxSteps = 48, finalizeTimeoutMs = timeoutMs } = options
+  for (const [name, value] of Object.entries({ maxSteps, timeoutMs, maxTokens, researchTimeoutMs, researchMaxSteps, finalizeTimeoutMs })) {
     if (!Number.isSafeInteger(value) || value <= 0) throw new Error(name + ' must be a positive integer')
   }
   const makeUserMessage = options.createUserMessage ?? userMessage
@@ -22,7 +23,9 @@ export function createWorkbench(ctx, library, options) {
   function snapshot(task) {
     if (!task) return null
     const { id, workspaceId, status, phase, error, steps, startedAt, finishedAt, mode, route } = task
-    return { id, workspaceId, sessionId: workspaceId, status, phase, error, steps, startedAt, finishedAt, mode, provider: route.provider, model: route.model }
+    return { id, workspaceId, sessionId: workspaceId, status, phase, error, steps, startedAt, finishedAt, mode, provider: route.provider, model: route.model,
+      ...(task.researchMode ? { automaticResearch: task.automaticResearch, collectionStop: task.collectionStop ?? null,
+        limits: { timeoutMs: researchTimeoutMs, maxSteps: researchMaxSteps, finalizeTimeoutMs } } : {}) }
   }
 
   function remember(record, row) {
@@ -46,12 +49,31 @@ export function createWorkbench(ctx, library, options) {
 
   function stop(record, cause, error = '') {
     const task = record.task
-    if (!task || task.status !== 'running' || task.stopCause) return
+    if (!task || task.status !== 'running' || (task.stopCause && !['user', 'disposed'].includes(cause))) return
     task.stopCause = cause
     task.error = error
     task.phase = 'stopping'
     task.controller.abort(new Error(error || '已停止'))
     record.agent?.cancel(cause === 'user' ? { kind: 'user' } : cause === 'disposed' ? { kind: 'disposed' } : { kind: 'hook', reason: error })
+  }
+
+  function researchProgress(workspaceId) {
+    const run = options.researchState?.(workspaceId)
+    const count = Number.isSafeInteger(run?.completedSources) ? run.completedSources
+      : (run?.imported?.length ?? 0) + (run?.reused?.length ?? 0)
+    return { running: run?.status === 'running', count, target: run?.targetSources }
+  }
+
+  // A collection boundary is not a user cancellation. Keep the top-level
+  // signal alive so already committed evidence can receive its own guide turn.
+  function stopCollection(record, cause, error = '') {
+    const task = record.task
+    if (!task?.automaticResearch || task.status !== 'running' || task.stopCause || task.collectionStop) return
+    task.collectionStop = cause
+    if (error) task.error = error
+    task.phase = 'finishing-collection'
+    task.collectionController.abort(new Error(error || '已收录目标来源，开始生成导读。'))
+    record.agent?.cancel({ kind: 'hook', reason: error || '已收录目标来源，开始生成导读。' })
   }
 
   function projectionFailure(record, error) {
@@ -162,11 +184,30 @@ export function createWorkbench(ctx, library, options) {
   })
 
   listen('agent/pre-step', async (payload, next) => {
-    const decision = await next()
     const record = owned.get(payload.agent.id)
+    const task = record?.task
+    if (task?.status === 'running' && !payload.signal.aborted) {
+      // Run before downstream compaction and model setup. This boundary is
+      // reached after the preceding native tools have settled and been saved.
+      if (task.automaticResearch) {
+        const progress = researchProgress(record.workspaceId)
+        if (progress.running && progress.target > 0 && progress.count >= progress.target) {
+          stopCollection(record, 'target')
+          return { kind: 'reject' }
+        }
+      }
+      const stepLimit = task.researchMode ? researchMaxSteps : maxSteps
+      if (task.steps >= stepLimit) {
+        const error = '已达到本轮工具步骤上限（' + stepLimit + '），可继续发送消息接着整理。'
+        if (task.automaticResearch) stopCollection(record, 'limit', error)
+        else stop(record, 'limit', error)
+        return { kind: 'reject' }
+      }
+    }
+    const decision = await next()
     if (decision?.kind !== 'enter' || !record || record.task?.status !== 'running' || payload.signal.aborted) return decision
-    if (record.task.steps >= maxSteps) stop(record, 'limit', '已达到本轮工具步骤上限（' + maxSteps + '），可继续发送消息接着整理。')
-    else { record.task.steps += 1; record.task.phase = 'thinking' }
+    record.task.steps += 1
+    record.task.phase = 'thinking'
     return decision
   })
 
@@ -182,7 +223,7 @@ export function createWorkbench(ctx, library, options) {
 
   listen('agent/error', ({ agent, error }) => {
     const task = owned.get(agent.id)?.task
-    if (task?.status === 'running' && !task.stopCause) task.error = messageOf(error)
+    if (task?.status === 'running' && !task.stopCause && !task.collectionStop) task.error = messageOf(error)
   })
 
   listen('agent/disposed', ({ agent }) => {
@@ -239,35 +280,74 @@ export function createWorkbench(ctx, library, options) {
   }
 
   async function drive(record, task, text) {
-    task.timer = setTimeout(() => stop(record, 'timeout', '本轮整理超过时间上限，已停止。可以继续发送消息。'), timeoutMs)
+    const collectionSignal = task.automaticResearch
+      ? AbortSignal.any([task.controller.signal, task.collectionController.signal]) : task.controller.signal
+    const collectionTimeoutMs = task.researchMode ? researchTimeoutMs : timeoutMs
+    task.timer = setTimeout(() => {
+      const error = '本轮整理超过时间上限，已停止。可以继续发送消息。'
+      if (task.automaticResearch) stopCollection(record, 'timeout', error)
+      else stop(record, 'timeout', error)
+    }, collectionTimeoutMs)
     try {
-      const agent = await ensureAgent(record, task)
+      let collectionFailed = false
+      try {
+        const agent = await ensureAgent(record, { ...task, controller: { signal: collectionSignal } })
+        collectionSignal.throwIfAborted()
+        if (typeof agent.model?.select === 'function') agent.model.select(task.route)
+        task.turnReason = null
+        const message = makeUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
+        const displayText = task.displayText ?? text
+        const row = append(record, {
+          role: 'user', text: displayText, content: [{ type: 'text', text: displayText }], provider: task.route.provider, model: task.route.model, status: 'pending',
+          metadata: { nativeSessionId: agent.id, nativeMessageId: message.id, ...(task.displayText === undefined ? {} : { displayText }) },
+        })
+        task.userRowId = row.id
+        task.phase = 'thinking'
+        agent.followup(message)
+        await agent.whenIdle()
+        await record.updates
+        const reason = task.turnReason
+        task.controller.signal.throwIfAborted()
+        if (task.collectionStop && task.collectionStop !== 'target') throw new Error(task.error)
+        if (!task.collectionStop && (reason?.kind === 'aborted' || reason?.kind === 'interrupted')) {
+          task.status = 'cancelled'
+          return
+        }
+        if (task.error || reason?.kind === 'error' || reason?.kind === 'max-tokens' || reason?.kind === 'blocked') {
+          throw new Error(task.error || reason.error?.message || (reason.kind === 'max-tokens' ? '模型输出达到上限，请继续或缩小任务范围。' : '模型任务被阻止。'))
+        }
+      } catch (error) {
+        // A provider/context/collection budget failure must not throw away
+        // committed sources. It remains a failure even if the partial guide
+        // succeeds; research.finish can then report the notebook as partial.
+        if (task.collectionStop === 'target' && !task.stopCause && !task.error && collectionSignal.aborted) {
+          // Some native hosts reject whenIdle on hook cancellation instead of
+          // resolving it with an aborted turn/end. Both are a normal target exit.
+        } else {
+          if (!task.automaticResearch || task.stopCause || task.controller.signal.aborted || !researchProgress(record.workspaceId).count) throw error
+          collectionFailed = true
+          task.collectionStop ||= 'error'
+          task.error ||= messageOf(error)
+        }
+      } finally {
+        if (task.automaticResearch) clearTimeout(task.timer)
+      }
       task.controller.signal.throwIfAborted()
-      if (typeof agent.model?.select === 'function') agent.model.select(task.route)
-      task.turnReason = null
-      const message = makeUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
-      const displayText = task.displayText ?? text
-      const row = append(record, {
-        role: 'user', text: displayText, content: [{ type: 'text', text: displayText }], provider: task.route.provider, model: task.route.model, status: 'pending',
-        metadata: { nativeSessionId: agent.id, nativeMessageId: message.id, ...(task.displayText === undefined ? {} : { displayText }) },
-      })
-      task.userRowId = row.id
-      task.phase = 'thinking'
-      agent.followup(message)
-      await agent.whenIdle()
-      await record.updates
-      const reason = task.turnReason
-      if (task.stopCause) {
-        if (!['user', 'disposed'].includes(task.stopCause)) throw new Error(task.error)
-        task.status = 'cancelled'
-      } else if (reason?.kind === 'aborted' || reason?.kind === 'interrupted') task.status = 'cancelled'
-      else if (task.error || reason?.kind === 'error' || reason?.kind === 'max-tokens' || reason?.kind === 'blocked') {
-        throw new Error(task.error || reason.error?.message || (reason.kind === 'max-tokens' ? '模型输出达到上限，请继续或缩小任务范围。' : '模型任务被阻止。'))
+      if (task.automaticResearch) {
+        if (!researchProgress(record.workspaceId).count) throw new Error('未保存并勾选可核验的网页来源，无法生成学习导读。')
+        task.phase = 'synthesizing'
+        const controller = new AbortController()
+        const signal = AbortSignal.any([task.controller.signal, controller.signal])
+        const timer = setTimeout(() => controller.abort(new Error('学习导读生成超过时间上限；已保存的来源仍可使用。')), finalizeTimeoutMs)
+        try {
+          await options.finalize?.(record.workspaceId, signal)
+          signal.throwIfAborted()
+        } finally { clearTimeout(timer) }
       } else {
         await options.finalize?.(record.workspaceId, task.controller.signal)
-        task.controller.signal.throwIfAborted()
-        task.status = 'done'
       }
+      task.controller.signal.throwIfAborted()
+      task.status = collectionFailed ? 'failed' : 'done'
     } catch (error) {
       task.status = ['user', 'disposed'].includes(task.stopCause) ? 'cancelled' : 'failed'
       if (task.status === 'failed') task.error = task.error || messageOf(error)
@@ -339,7 +419,9 @@ export function createWorkbench(ctx, library, options) {
         if (!route?.provider || !route?.model) throw new Error('请选择可用的模型')
         library.updateWorkspace(workspaceId, { provider: route.provider, model: route.model, mode })
       } finally { reservations.delete(workspaceId) }
-      const task = { id: randomUUID(), workspaceId, status: 'running', phase: 'preparing', error: '', steps: 0, startedAt: Date.now(), finishedAt: null, mode, route: { ...route }, controller: new AbortController(), displayText: presentation.displayText }
+      const task = { id: randomUUID(), workspaceId, status: 'running', phase: 'preparing', error: '', steps: 0, startedAt: Date.now(), finishedAt: null, mode, route: { ...route },
+        researchMode: mode === 'research', automaticResearch: mode === 'research' && researchProgress(workspaceId).running,
+        controller: new AbortController(), collectionController: new AbortController(), displayText: presentation.displayText }
       tasks.set(workspaceId, task)
       let record = owned.get(workspaceId)
       if (!record) {

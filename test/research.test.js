@@ -72,6 +72,19 @@ test('URL normalization deduplicates fragments, preserves query identity and rej
   assert.equal(f.status().completedSources, 1)
 })
 
+test('collection target alone cannot mark a notebook complete without its saved guide', t => {
+  const f = fixture(t)
+  const prompt = 'UNIQUE_RESEARCH_GOAL 研究海洋碳汇的方法与争议'
+  f.begin({ targetSources: 1, prompt })
+  f.search(['https://example.com/verified'])
+  f.fetch('https://example.com/verified')
+  const instructions = f.research.instructions(f.workspace.id)
+  assert.equal(instructions.includes(prompt), false, 'the full goal is already in the user message')
+  assert.match(instructions, /已保存来源/)
+  assert.ok(instructions.includes(f.status().imported[0].sourceId))
+  assert.equal(f.research.finish(f.workspace.id, { status: 'done' }).status, 'partial')
+})
+
 test('repeated final observations and redirect aliases count one saved source', t => {
   const f = fixture(t)
   f.begin()
@@ -98,6 +111,7 @@ test('existing URL sources are reused without counting unrelated notebook source
   assert.equal(f.status().reusedCount, 1)
   assert.equal(f.status().reused[0].sourceId, existing.id)
   assert.equal(f.library.listSources(f.notebook.id).length, 2)
+  f.research.update(f.workspace.id, { artifactStatus: 'done' })
   assert.equal(f.research.finish(f.workspace.id, { status: 'done' }).status, 'done')
 })
 
@@ -113,6 +127,7 @@ test('disabled existing sources remain disabled and do not count toward automati
   assert.equal(f.status().candidates[0].status, 'failed')
   assert.match(f.status().failures[0].message, /未勾选/)
   f.fetch('https://example.com/available')
+  f.research.update(f.workspace.id, { artifactStatus: 'done' })
   assert.equal(f.research.finish(f.workspace.id, { status: 'done' }).status, 'done')
 })
 

@@ -21,6 +21,8 @@ export const Config = Schema.object({
   assistantMaxSteps: Schema.number().default(24),
   assistantTimeoutMs: Schema.number().default(180000),
   assistantMaxTokens: Schema.number().default(8192),
+  researchMaxSteps: Schema.number().default(48),
+  researchTimeoutMs: Schema.number().default(900000),
   maxChatChars: Schema.number().default(32000),
 })
 

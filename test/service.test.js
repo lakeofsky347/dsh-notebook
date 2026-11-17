@@ -45,7 +45,7 @@ function fixture(t, overrides = {}, transport = 'legacy') {
       session: { id, events, append(type, data) { events.push({ type, data, seq: ++eventSequence }) } },
       options: { ...selected },
       model: { current: () => ({ ...selected }), select: value => { selected = { ...value } } },
-      ctx: { tools: { restrict: ({ allow }) => {
+      ctx: { get(name) { return name === 'toolResultPruner' ? state.pruner : undefined }, tools: { restrict: ({ allow }) => {
         const value = [...allow]
         restrictions.set(id, value)
         return () => { if (restrictions.get(id) === value) restrictions.delete(id) }
@@ -143,6 +143,7 @@ function fixture(t, overrides = {}, transport = 'legacy') {
       },
     },
     llm: {
+      async resolveModelInfo(provider, model) { return state.modelInfo ?? { provider, id: model } },
       listProviders: () => state.providers,
       async listModels(provider) { if (state.modelErrors[provider]) throw state.modelErrors[provider]; return state.models[provider] ?? [] },
       async *stream(request) {
@@ -947,6 +948,87 @@ test('context injection reflects source selection and clears cached passages aft
   assert.doesNotMatch(section.text({ agent: host.agents.get('host-session') }), /sourceId=/)
   await host.preStep('host-session', 'copper')
   assert.doesNotMatch(section.text({ agent: host.agents.get('host-session') }), /sourceId=/)
+})
+
+test('model source tools page long bodies while the saved and UI source remain complete', async t => {
+  const host = fixture(t, { maxUploadBytes: 200000 })
+  const { workspaceId, notebookId } = await workspaceWithNotebook(host)
+  await host.tool('notebook_open', { notebookId })
+  const body = ('中文参考资料：copper conducts electricity.\n').repeat(900)
+  const added = await host.tool('notebook_add_source', { kind: 'text', title: 'Long source', text: body })
+  assert.equal(added.ok, true)
+  assert.equal(added.source.body, undefined, 'save acknowledgement stays metadata-only')
+  const firstPage = (await host.tool('notebook_source', { id: added.source.id })).source
+  assert.equal(firstPage.body.length, 6000)
+  assert.equal(firstPage.bodyLength, body.length)
+  assert.equal(firstPage.nextOffset, 6000)
+  let reconstructed = ''
+  let offset = 0
+  do {
+    const page = (await host.tool('notebook_source', { id: added.source.id, offset, limit: 4000 })).source
+    assert.ok(page.body.length <= 4000)
+    reconstructed += page.body
+    offset = page.nextOffset
+  } while (offset !== null)
+  const saved = host.library.getSource(notebookId, added.source.id)
+  assert.equal(reconstructed, saved.body)
+  assert.equal((await host.handle({ op: 'source', workspaceId, id: added.source.id })).source.body, saved.body)
+  for (const args of [{ offset: -1 }, { offset: 0.5 }, { limit: 12001 }, { offset: body.length + 1 }]) {
+    assert.equal((await host.tool('notebook_source', { id: added.source.id, ...args })).ok, false)
+  }
+  const unicode = await host.tool('notebook_add_source', { kind: 'text', title: 'Unicode source', text: '😀中' })
+  const completeCharacter = (await host.tool('notebook_source', { id: unicode.source.id, limit: 1 })).source
+  assert.equal(completeCharacter.body, '😀')
+  assert.equal(completeCharacter.nextOffset, 2)
+  const remainder = (await host.tool('notebook_source', { id: unicode.source.id, offset: completeCharacter.nextOffset, limit: 1 })).source
+  assert.equal(remainder.body, '中')
+  assert.equal(remainder.nextOffset, null)
+  const splitCharacter = await host.tool('notebook_source', { id: unicode.source.id, offset: 1, limit: 1 })
+  assert.equal(splitCharacter.ok, false)
+  assert.match(splitCharacter.error, /offset splits a Unicode character; use offset 0/)
+})
+
+test('owned collection prunes native history and does not reinject source bodies every step', async t => {
+  const host = fixture(t)
+  const { workspaceId, notebookId } = await workspaceWithNotebook(host)
+  const source = host.library.addText(notebookId, 'Evidence', 'copper original evidence UNIQUE_SOURCE_BODY')
+  const pruned = []
+  host.state.pruner = { pruneSession(session) { pruned.push(session.id); return { pruned: [], charsRemoved: 0 } } }
+  await host.runtime.prepare(workspaceId, { provider: 'p', model: 'm' })
+  await host.handle({ op: 'workspaceUpdate', workspaceId, mode: 'research' })
+  await host.preStep(workspaceId, 'copper')
+  assert.deepEqual(pruned, [workspaceId])
+  assert.equal(host.sections.get('notebook:context').text({ agent: host.agents.get(workspaceId) }), '')
+  assert.equal(host.library.getSource(notebookId, source.id).body, 'copper original evidence UNIQUE_SOURCE_BODY')
+  await host.preStep('host-session', 'copper')
+  assert.equal(pruned.length, 1, 'unowned sessions keep their host policy')
+  await host.handle({ op: 'workspaceUpdate', workspaceId, mode: 'sources' })
+  await host.preStep(workspaceId, 'copper')
+  assert.match(host.sections.get('notebook:context').text({ agent: host.agents.get(workspaceId) }), /UNIQUE_SOURCE_BODY/)
+})
+
+test('Studio fits evidence to the selected model window and fails oversized instructions before calling it', async t => {
+  const host = fixture(t, { maxUploadBytes: 100000, maxInjectChars: 16000, chunkChars: 8000, chunkOverlap: 0 })
+  const { workspaceId, notebookId } = await workspaceWithNotebook(host, 'Small-window study')
+  const first = host.library.addText(notebookId, 'First source', '铜的导电机制。'.repeat(1500))
+  const second = host.library.addText(notebookId, 'Second source', '铜与其他金属比较。'.repeat(1500))
+  host.state.modelInfo = { context: { contextWindow: 12000 }, defaultMaxTokens: 4096 }
+  const generated = await host.handle({ op: 'generate', workspaceId, kind: 'briefing', prompt: '比较两份资料，保留关键条件。' })
+  assert.equal((await host.jobs.get(generated.jobId).done).status, 'completed')
+  const request = host.state.requests.at(-1)
+  const prompt = request.messages[0].content[0].text
+  assert.equal(request.maxTokens, 3000)
+  assert.ok(Buffer.byteLength(prompt) + request.maxTokens + 1024 <= 12000)
+  for (const source of [first, second]) assert.ok(prompt.includes('sourceId=' + source.id))
+  assert.match(prompt, /比较两份资料，保留关键条件。/)
+  assert.ok(host.library.getSource(notebookId, first.id).body.length > 6000)
+  const calls = host.state.requests.length
+  const tooLong = await host.handle({ op: 'generate', workspaceId, kind: 'briefing', prompt: '完整保留这个要求。'.repeat(1500) })
+  const failure = await host.jobs.get(tooLong.jobId).done
+  assert.equal(failure.status, 'failed')
+  assert.match(failure.detail, /上下文预算/)
+  assert.equal(host.state.requests.length, calls, 'do not submit a request known to exceed its window')
+  assert.equal(host.library.getArtifact(tooLong.artifactId).body, '')
 })
 
 test('HTTP API enforces authentication, method, JSON validity, and request size', async t => {

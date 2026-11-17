@@ -254,16 +254,257 @@ test('stop cancels the owned native turn and retains an interrupted stream prefi
 
 test('native turn timeout and step limit stop work and report distinct failures', async t => {
   const slow = fixture(t, { run: async ({ signal }) => { await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })) } }, { timeoutMs: 20 })
-  await slow.runtime.start(slow.workspace.id, 'slow')
+  await slow.runtime.start(slow.workspace.id, 'slow', route, 'sources')
   const timeout = await settled(slow.runtime, slow.workspace.id)
   assert.equal(timeout.status, 'failed')
   assert.match(timeout.error, /时间上限/)
   const bounded = fixture(t, { run: async ({ step }) => { assert.equal(await step(2), false) } }, { maxSteps: 1 })
-  await bounded.runtime.start(bounded.workspace.id, 'loop')
+  await bounded.runtime.start(bounded.workspace.id, 'loop', route, 'sources')
   const limit = await settled(bounded.runtime, bounded.workspace.id)
   assert.equal(limit.status, 'failed')
   assert.match(limit.error, /步骤上限/)
   assert.equal(limit.steps, 1)
+})
+
+test('free research uses its own time and step budgets without an automatic research record', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let entered, release
+  const running = new Promise(resolve => { entered = resolve })
+  const waiting = new Promise(resolve => { release = resolve })
+  const f = fixture(t, { run: async ({ step, answer }) => {
+    entered()
+    await waiting
+    assert.equal(await step(2), true)
+    answer('Collected the requested resources', 2)
+  } }, { timeoutMs: 10, maxSteps: 1, researchTimeoutMs: 100, researchMaxSteps: 3 })
+  await f.runtime.start(f.workspace.id, '自由搜集资料', route, 'research')
+  await running
+  t.mock.timers.tick(60)
+  assert.equal(f.runtime.task(f.workspace.id).status, 'running')
+  release()
+  const task = await settled(f.runtime, f.workspace.id)
+  assert.equal(task.status, 'done')
+  assert.equal(task.automaticResearch, false)
+  assert.equal(task.steps, 2)
+  assert.deepEqual(task.limits, { timeoutMs: 100, maxSteps: 3, finalizeTimeoutMs: 10 })
+  assert.equal(f.native.calls.cancelled.length, 0)
+})
+
+test('automatic collection and guide receive independent deadlines', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let enteredCollection, releaseCollection, enteredGuide, releaseGuide
+  const collecting = new Promise(resolve => { enteredCollection = resolve })
+  const collectionWait = new Promise(resolve => { releaseCollection = resolve })
+  const guiding = new Promise(resolve => { enteredGuide = resolve })
+  const guideWait = new Promise(resolve => { releaseGuide = resolve })
+  const progress = { status: 'running', completedSources: 0, targetSources: 1 }
+  let guideSignal
+  const f = fixture(t, { run: async ({ answer }) => {
+    enteredCollection()
+    await collectionWait
+    progress.completedSources = 1
+    answer('Saved source')
+  } }, { timeoutMs: 10, researchTimeoutMs: 100, finalizeTimeoutMs: 100,
+    researchState: () => progress,
+    async finalize(_workspaceId, signal) { guideSignal = signal; enteredGuide(); await guideWait; signal.throwIfAborted() },
+  })
+  await f.runtime.start(f.workspace.id, '自动构建', route, 'research')
+  await collecting
+  t.mock.timers.tick(80)
+  releaseCollection()
+  await guiding
+  t.mock.timers.tick(80)
+  assert.equal(guideSignal.aborted, false)
+  assert.equal(f.runtime.task(f.workspace.id).status, 'running')
+  releaseGuide()
+  assert.equal((await settled(f.runtime, f.workspace.id)).status, 'done')
+  assert.equal(f.native.calls.cancelled.length, 0)
+})
+
+test('saved source target rejects the next native step before downstream maintenance', async t => {
+  const progress = { status: 'running', completedSources: 0, targetSources: 1 }
+  let finalizations = 0, downstreamSteps = 0
+  const f = fixture(t, { run: async ({ step }) => {
+    progress.completedSources = 1
+    assert.equal(await step(2), false)
+  } }, { researchState: () => progress, async finalize(_id, signal) { assert.equal(signal.aborted, false); finalizations += 1 } })
+  f.native.ctx.on('agent/pre-step', async (_payload, next) => { downstreamSteps += 1; return next() })
+  await f.runtime.start(f.workspace.id, 'Collect one source', route, 'research')
+  const task = await settled(f.runtime, f.workspace.id)
+  assert.equal(task.status, 'done')
+  assert.equal(task.error, '')
+  assert.equal(task.collectionStop, 'target')
+  assert.equal(task.steps, 1)
+  assert.equal(downstreamSteps, 1)
+  assert.equal(f.native.calls.routes.length, 1)
+  assert.equal(finalizations, 1)
+})
+
+test('research step exhaustion still produces one partial guide without clearing the failure', async t => {
+  const progress = { status: 'running', imported: [], reused: [], targetSources: 3 }
+  let finalizations = 0
+  const f = fixture(t, { run: async ({ step }) => {
+    progress.imported.push({ sourceId: 'committed-source' })
+    assert.equal(await step(2), false)
+  } }, { researchState: () => progress, researchMaxSteps: 1,
+    async finalize(_id, signal) { assert.equal(signal.aborted, false); finalizations += 1 },
+  })
+  await f.runtime.start(f.workspace.id, 'Collect three sources', route, 'research')
+  const task = await settled(f.runtime, f.workspace.id)
+  assert.equal(task.status, 'failed')
+  assert.equal(task.collectionStop, 'limit')
+  assert.match(task.error, /步骤上限/)
+  assert.equal(finalizations, 1)
+  assert.equal(progress.imported.length, 1)
+})
+
+test('research timeout preserves saved evidence and gives its guide an un-aborted signal', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const progress = { status: 'running', completedSources: 0, targetSources: 3 }
+  let entered, finalizations = 0
+  const collecting = new Promise(resolve => { entered = resolve })
+  const f = fixture(t, { run: async ({ signal }) => {
+    progress.completedSources = 1
+    entered()
+    await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }))
+  } }, { researchState: () => progress, researchTimeoutMs: 100,
+    async finalize(_id, signal) { assert.equal(signal.aborted, false); finalizations += 1 },
+  })
+  await f.runtime.start(f.workspace.id, 'Collect three sources', route, 'research')
+  await collecting
+  t.mock.timers.tick(100)
+  const task = await settled(f.runtime, f.workspace.id)
+  assert.equal(task.status, 'failed')
+  assert.equal(task.collectionStop, 'timeout')
+  assert.match(task.error, /时间上限/)
+  assert.equal(finalizations, 1)
+})
+
+test('terminal context errors retain their diagnostic while saved sources receive a partial guide', async t => {
+  const progress = { status: 'running', completedSources: 0, targetSources: 3 }
+  let finalizations = 0
+  const f = fixture(t, { run: async () => {
+    progress.completedSources = 1
+    throw new Error('maximum context length exceeded')
+  } }, { researchState: () => progress, async finalize(_id, signal) { assert.equal(signal.aborted, false); finalizations += 1 } })
+  await f.runtime.start(f.workspace.id, 'Collect sources', route, 'research')
+  const task = await settled(f.runtime, f.workspace.id)
+  assert.equal(task.status, 'failed')
+  assert.equal(task.collectionStop, 'error')
+  assert.match(task.error, /maximum context length exceeded/)
+  assert.equal(finalizations, 1)
+  assert.equal(f.native.calls.create, 1, 'context failure must not silently replace the native session')
+})
+
+test('user cancellation wins over a just-reached collection deadline and does not start a guide', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const progress = { status: 'running', completedSources: 0, targetSources: 3 }
+  let entered, finalizations = 0
+  const collecting = new Promise(resolve => { entered = resolve })
+  const f = fixture(t, { run: async ({ signal }) => {
+    progress.completedSources = 1
+    entered()
+    await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }))
+  } }, { researchState: () => progress, researchTimeoutMs: 100, async finalize() { finalizations += 1 } })
+  await f.runtime.start(f.workspace.id, 'Collect sources', route, 'research')
+  await collecting
+  t.mock.timers.tick(100)
+  f.runtime.cancel(f.workspace.id)
+  assert.equal((await settled(f.runtime, f.workspace.id)).status, 'cancelled')
+  assert.equal(finalizations, 0)
+  assert.equal(progress.completedSources, 1)
+})
+
+test('automatic research with no saved sources fails without generating a guide', async t => {
+  let finalizations = 0
+  const f = fixture(t, {}, { researchState: () => ({ status: 'running', completedSources: 0, targetSources: 3 }), async finalize() { finalizations += 1 } })
+  await f.runtime.start(f.workspace.id, 'Collect sources', route, 'research')
+  const task = await settled(f.runtime, f.workspace.id)
+  assert.equal(task.status, 'failed')
+  assert.match(task.error, /未保存.*来源/)
+  assert.equal(finalizations, 0)
+})
+
+test('cancelling or timing out the independent guide aborts its signal', async t => {
+  for (const scenario of ['cancel', 'timeout']) await t.test(scenario, async subtest => {
+    subtest.mock.timers.enable({ apis: ['setTimeout'] })
+    const progress = { status: 'running', completedSources: 0, targetSources: 1 }
+    let entered, guideSignal
+    const guiding = new Promise(resolve => { entered = resolve })
+    const f = fixture(subtest, { run: async () => { progress.completedSources = 1 } }, {
+      researchState: () => progress, finalizeTimeoutMs: 100,
+      async finalize(_id, signal) {
+        guideSignal = signal
+        entered()
+        await new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+      },
+    })
+    await f.runtime.start(f.workspace.id, 'Collect sources', route, 'research')
+    await guiding
+    if (scenario === 'cancel') f.runtime.cancel(f.workspace.id)
+    else subtest.mock.timers.tick(100)
+    const task = await settled(f.runtime, f.workspace.id)
+    assert.equal(guideSignal.aborted, true)
+    assert.equal(task.status, scenario === 'cancel' ? 'cancelled' : 'failed')
+    if (scenario === 'timeout') assert.match(task.error, /导读.*时间上限/)
+    assert.equal(progress.completedSources, 1)
+  })
+})
+
+test('projection failure with saved sources does not start another model call for a guide', async t => {
+  const progress = { status: 'running', completedSources: 0, targetSources: 3 }
+  let finalizations = 0
+  const f = fixture(t, { run: async ({ event, message }) => {
+    progress.completedSources = 1
+    const update = f.library.updateMessage
+    f.library.updateMessage = () => { throw new Error('disk write failed') }
+    event('user/message', message)
+    f.library.updateMessage = update
+  } }, { researchState: () => progress, async finalize() { finalizations += 1 } })
+  await f.runtime.start(f.workspace.id, 'Collect sources', route, 'research')
+  const task = await settled(f.runtime, f.workspace.id)
+  assert.equal(task.status, 'failed')
+  assert.match(task.error, /记录失败.*disk write failed/)
+  assert.equal(finalizations, 0)
+})
+
+test('disposing automatic research keeps its committed sources without starting a guide', async t => {
+  const progress = { status: 'running', completedSources: 0, targetSources: 3 }
+  let entered, finalizations = 0
+  const collecting = new Promise(resolve => { entered = resolve })
+  const f = fixture(t, { run: async ({ signal }) => {
+    progress.completedSources = 1
+    entered()
+    await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true }))
+  } }, { researchState: () => progress, async finalize() { finalizations += 1 } })
+  await f.runtime.start(f.workspace.id, 'Collect sources', route, 'research')
+  await collecting
+  await f.runtime.dispose()
+  assert.equal(f.runtime.task(f.workspace.id).status, 'cancelled')
+  assert.equal(finalizations, 0)
+  assert.equal(progress.completedSources, 1)
+})
+
+test('target completion also succeeds when the native idle waiter rejects hook cancellation', async t => {
+  const progress = { status: 'running', completedSources: 0, targetSources: 1 }
+  let finalizations = 0
+  const f = fixture(t, { run: async ({ step }) => {
+    progress.completedSources = 1
+    await step(2)
+  } }, {
+    researchState: () => progress,
+    setupAgent(_ctx, agent) {
+      const whenIdle = agent.whenIdle
+      agent.whenIdle = async () => { await whenIdle(); throw new Error('native waiter was aborted by hook') }
+    },
+    async finalize(_id, signal) { assert.equal(signal.aborted, false); finalizations += 1 },
+  })
+  await f.runtime.start(f.workspace.id, 'Collect a source', route, 'research')
+  const task = await settled(f.runtime, f.workspace.id)
+  assert.equal(task.status, 'done')
+  assert.equal(task.collectionStop, 'target')
+  assert.equal(task.error, '')
+  assert.equal(finalizations, 1)
 })
 
 test('native Agent errors fail the task instead of claiming a completed answer', async t => {
