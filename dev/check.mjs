@@ -26,11 +26,16 @@ const pending = new Map()
 let seq = 0
 const report = { fixtureOnly: true, checks: [], exceptions: [], screenshots: [] }
 const sessions = new Set()
-function check(name, value = true) { assert.ok(value, name); report.checks.push(name) }
+function check(name, value = true) { assert.ok(value, name); report.checks.push(name); console.log('[pass] ' + name) }
 async function poll(fn, timeout = 6000) { const start = Date.now(); let last; while (Date.now() - start < timeout) { try { const result = await fn(); if (result) return result } catch (error) { last = error } await delay(35) }; throw last || new Error('等待条件超时') }
-function send(method, params = {}, sessionId) {
+function send(method, params = {}, sessionId, timeoutMs = 15000) {
   const id = ++seq
-  return new Promise((resolve, reject) => { pending.set(id, { resolve, reject }); ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) })) })
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error('CDP timeout: ' + method + ' session=' + (sessionId || 'browser') + ' after=' + (report.checks.at(-1) || 'startup'))) }, timeoutMs)
+    pending.set(id, { resolve(value) { clearTimeout(timer); resolve(value) }, reject(error) { clearTimeout(timer); reject(error) } })
+    try { ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) })) }
+    catch (error) { pending.get(id)?.reject(error); pending.delete(id) }
+  })
 }
 async function evaluate(session, expression) {
   const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, session)
@@ -43,6 +48,8 @@ async function open(scene, width = 1440, height = 960) {
   const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
   sessions.add(sessionId)
   await send('Runtime.enable', {}, sessionId); await send('Page.enable', {}, sessionId)
+  // Observe scheduling from the first client render without changing the clock.
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { const request = window.requestAnimationFrame.bind(window); window.__nbRafRequests = 0; window.requestAnimationFrame = callback => { window.__nbRafRequests++; return request(callback) }; })()` }, sessionId)
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false }, sessionId)
   await send('Page.navigate', { url: base + '/dev/preview.html?scene=' + scene + '&chrome=0' }, sessionId)
   await waitFor(sessionId, scene === 'unauthenticated' ? `window.__nbDev && document.querySelector('.dsh-nb-status')?.textContent.includes('需要先登录桌面端')` : `window.__nbDev && document.querySelector('.dsh-nb-workbench')?.dataset.workspaceId`)
@@ -52,6 +59,24 @@ async function input(session, selector, value) { await evaluate(session, `(() =>
 async function click(session, selector) { await evaluate(session, `document.querySelector(${JSON.stringify(selector)}).click()`); await delay(30) }
 async function select(session, selector, value) { await evaluate(session, `(() => { const node = document.querySelector(${JSON.stringify(selector)}); node.value = ${JSON.stringify(value)}; node.dispatchEvent(new Event('change', { bubbles: true })); })()`); await delay(50) }
 async function shot(session, name) { const result = await send('Page.captureScreenshot', { format: 'png' }, session); const path = join(outputDir, name + '.png'); await writeFile(path, Buffer.from(result.data, 'base64')); report.screenshots.push(path) }
+async function activityFrame(session) {
+  // Crop the indicator itself: typing cursors and other page content cannot make
+  // a static whale appear animated (or invalidate a reduced-motion comparison).
+  const clip = await evaluate(session, `(() => { const rect = document.querySelector('.dsh-nb-activity[data-activity="running"]').getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scale: 1 }; })()`)
+  return (await send('Page.captureScreenshot', { format: 'png', clip }, session)).data
+}
+async function fixtureRefresh(session, expression) {
+  const before = await evaluate(session, `window.__nbDev.requests.filter(item => item.op === 'state').length`)
+  await evaluate(session, expression)
+  // Observe two normal state reads so assertions run after the changed fixture
+  // has traversed the same polling/rendering path as a service response.
+  await waitFor(session, `window.__nbDev.requests.filter(item => item.op === 'state').length >= ${before + 2}`)
+}
+async function beginActivity(session) {
+  await evaluate(session, `(() => { const id = document.querySelector('.dsh-nb-workbench').dataset.workspaceId; window.__nbDev.store.tasks[id] = { id: 'motion-fixture', status: 'running', phase: 'tool:web_search', provider: 'dev-local', model: 'fixture-research' }; })()`)
+  await waitFor(session, `document.querySelector('.dsh-nb-activity[data-activity="running"]') && document.querySelector('[data-action="stop"]')`)
+  await waitFor(session, `document.querySelector('.dsh-nb-activity').getAnimations({ subtree: true }).every(animation => animation.playState !== 'running')`)
+}
 async function enterPractice(session) {
   await waitFor(session, `document.querySelector('[data-action="study-start"], [data-study-item], [data-study-result]')`)
   if (await evaluate(session, `!!document.querySelector('[data-action="study-start"]')`)) await click(session, '[data-action="study-start"]')
@@ -74,6 +99,7 @@ try {
     if (message.id && pending.has(message.id)) { const request = pending.get(message.id); pending.delete(message.id); message.error ? request.reject(new Error(JSON.stringify(message.error))) : request.resolve(message.result) }
     if (message.method === 'Runtime.exceptionThrown') report.exceptions.push(message.params.exceptionDetails.text + ': ' + (message.params.exceptionDetails.exception?.description || ''))
   })
+  ws.addEventListener('close', () => { for (const request of pending.values()) request.reject(new Error('Browser connection closed')); pending.clear() })
   const ready = await open('ready')
   check('工作台通过宿主 RPC 通道加载资料与模型', await evaluate(ready, `window.__nbDev.requests.some(item => item.op === 'state') && window.__nbDev.requests.some(item => item.op === 'catalog') && window.__nbDev.requests.every(item => item.rpc && item.url === 'api/dsh-notebook/api' && item.method === 'dsh-notebook/api')`))
   check('工作台加载来源与模型目录', await evaluate(ready, `document.querySelectorAll('.dsh-nb-source').length === 4 && document.querySelector('[aria-label="对话模型"]').value === JSON.stringify(['dev-local', 'fixture-research'])`))
@@ -103,13 +129,13 @@ try {
   await click(ready, '.dsh-nb-send')
   await waitFor(ready, `document.querySelector('.dsh-nb-message.assistant')`)
   check('纯工具调用的空助手行隐藏', await evaluate(ready, `document.querySelectorAll('.dsh-nb-message.assistant').length === 1 && window.__nbDev.store.messages.ws1.filter(item => item.role === 'assistant').length === 2`))
-  check('真实消息与工具进度来自服务状态', await evaluate(ready, `document.querySelectorAll('.dsh-nb-message.tool').length === 2 && !document.querySelector('.dsh-nb-thread').textContent.includes('已发送到当前对话')`))
+  check('显示真实问答并将工具记录留在服务状态', await evaluate(ready, `window.__nbDev.store.messages.ws1.filter(item => item.role === 'tool').length === 2 && !document.querySelector('.dsh-nb-message.tool, .dsh-nb-message.system') && document.querySelector('.dsh-nb-message.user').textContent.includes('搜集插件架构资料') && document.querySelector('.dsh-nb-message.assistant').textContent.includes('已围绕你的目标整理资料') && !document.querySelector('.dsh-nb-thread').textContent.includes('已发送到当前对话')`))
   check('模型搜集后来源自动刷新', await evaluate(ready, `document.querySelectorAll('.dsh-nb-source').length === 5`))
   await click(ready, '[data-mode="sources"]')
   check('工作模式持久化', await evaluate(ready, `window.__nbDev.store.workspaces[0].mode === 'sources'`))
   await click(ready, '.dsh-nb-card')
-  await waitFor(ready, `document.querySelector('canvas.dsh-nb-particles')?.dataset.particleMode === 'writing'`)
-  check('Studio 整理期间显示生成粒子状态')
+  await waitFor(ready, `document.querySelector('.dsh-nb-activity[data-activity="running"]')`)
+  check('Studio 整理期间只有一个可访问的轻量运行提示', await evaluate(ready, `document.querySelectorAll('.dsh-nb-activity[data-activity="running"]').length === 1 && document.querySelector('.dsh-nb-activity').getAttribute('role') === 'status' && document.querySelector('.dsh-nb-activity').getAttribute('aria-label') === '正在处理' && !document.querySelector('canvas, .dsh-nb-task')`))
   await waitFor(ready, `document.querySelector('.dsh-nb-preview')?.textContent.includes('后台任务完成后自动刷新')`)
   check('Studio 后台完成后自动刷新正文')
   await shot(ready, 'studio-detail')
@@ -119,7 +145,7 @@ try {
   await waitFor(ready, `document.querySelector('.dsh-nb-source-body')`)
   await evaluate(ready, `window.__nbDev.store.workspaces[0].notebookId = 'nb2'`)
   await waitFor(ready, `document.querySelector('.dsh-nb-workbench').dataset.notebookId === 'nb2' && !document.querySelector('.dsh-nb-source-body') && !document.querySelector('.dsh-nb-preview')`)
-  check('同会话外部切换笔记本清详情并保留消息', await evaluate(ready, `document.querySelectorAll('.dsh-nb-message').length >= 4`))
+  check('同会话外部切换笔记本清详情并保留消息', await evaluate(ready, `document.querySelectorAll('.dsh-nb-message.user').length === 1 && document.querySelectorAll('.dsh-nb-message.assistant').length === 1 && window.__nbDev.store.messages.ws1.filter(item => item.role === 'tool').length === 2`))
   await click(ready, '[data-action="history"]')
   await select(ready, '[aria-label="工作台会话"]', 'ws2')
   await waitFor(ready, `document.querySelector('.is-main .dsh-nb-head')?.textContent.includes('插件架构笔记')`)
@@ -131,7 +157,7 @@ try {
   await click(ready, '[data-action="history"]')
   await select(ready, '[aria-label="工作台会话"]', 'ws1')
   await delay(400)
-  check('延迟响应不会覆盖当前工作台', await evaluate(ready, `document.querySelector('.dsh-nb-workbench').dataset.workspaceId === 'ws1' && document.querySelectorAll('.dsh-nb-message').length >= 4`))
+  check('延迟响应不会覆盖当前工作台', await evaluate(ready, `document.querySelector('.dsh-nb-workbench').dataset.workspaceId === 'ws1' && document.querySelector('.dsh-nb-message.user').textContent.includes('搜集插件架构资料') && document.querySelector('.dsh-nb-message.assistant').textContent.includes('已围绕你的目标整理资料')`))
   const noSession = await open('nosession')
   await click(noSession, '[data-action="more"]')
   check('无宿主会话也可使用工作台', await evaluate(noSession, `document.querySelector('[data-action="bind-session"]').disabled && !document.querySelector('[data-action="new-workspace"]').disabled`))
@@ -146,19 +172,18 @@ try {
   await input(slow, '[aria-label="发送给模型的消息"]', '测试可停止的研究任务')
   await click(slow, '.dsh-nb-send')
   await waitFor(slow, `document.querySelector('[data-action="stop"]')`)
-  await waitFor(slow, `document.querySelector('.dsh-nb-task')?.textContent.includes('正在搜索网页')`)
-  check('工具阶段显示中文进度')
-  check('搜集资料时粒子场切换为紧凑搜集状态', await evaluate(slow, `document.querySelector('.dsh-nb-sea').classList.contains('is-compact') && document.querySelector('canvas.dsh-nb-particles').dataset.particleMode === 'collecting'`))
-  await evaluate(slow, `window.__nbDev.store.tasks.ws1.phase = 'thinking'`)
-  await waitFor(slow, `document.querySelector('canvas.dsh-nb-particles').dataset.particleMode === 'thinking'`)
-  check('模型思考驱动粒子状态')
-  await evaluate(slow, `window.__nbDev.store.tasks.ws1.phase = 'answering'`)
-  await waitFor(slow, `document.querySelector('canvas.dsh-nb-particles').dataset.particleMode === 'writing'`)
-  check('模型回答驱动粒子状态')
+  await waitFor(slow, `document.querySelector('.dsh-nb-activity[data-activity="running"]')`)
+  check('工具执行期间用单个稳定运行提示代替阶段文字', await evaluate(slow, `document.querySelectorAll('.dsh-nb-activity[data-activity="running"]').length === 1 && document.querySelector('.dsh-nb-activity').getAttribute('aria-label') === '正在处理' && !document.querySelector('.dsh-nb-task, .dsh-nb-message.tool') && !/正在搜索网页|正在思考|tool:web_search/.test(document.querySelector('.dsh-nb-thread').textContent)`))
+  const activityBounds = await evaluate(slow, `(() => { const rect = document.querySelector('.dsh-nb-activity').getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })()`)
+  check('运行提示只占用小型固定槽位', activityBounds.width > 0 && activityBounds.width <= 32 && activityBounds.height > 0 && activityBounds.height <= 32)
+  await fixtureRefresh(slow, `window.__nbDev.store.tasks.ws1.phase = 'thinking'; window.__nbDev.store.messages.ws1.push({ id: 'raw-tool-fixture', role: 'tool', text: '{"query":"DO_NOT_RENDER_TOOL_JSON","phase":"thinking"}', status: 'done' })`)
+  check('模型内部阶段变化不暴露过程与原始工具 JSON', await evaluate(slow, `document.querySelectorAll('.dsh-nb-activity[data-activity="running"]').length === 1 && !document.querySelector('.dsh-nb-task, .dsh-nb-message.tool') && !/DO_NOT_RENDER_TOOL_JSON|正在思考|thinking/.test(document.querySelector('.dsh-nb-thread').textContent)`))
+  await fixtureRefresh(slow, `window.__nbDev.store.tasks.ws1.phase = 'answering'`)
+  check('回答阶段沿用同一个稳定提示且保持停止操作', await evaluate(slow, `document.querySelectorAll('.dsh-nb-activity[data-activity="running"]').length === 1 && document.querySelector('.dsh-nb-activity').getAttribute('aria-label') === '正在处理' && document.querySelector('[data-action="stop"]') && !/正在回答|answering/.test(document.querySelector('.dsh-nb-thread').textContent)`))
   await click(slow, '[data-action="stop"]')
-  await waitFor(slow, `document.querySelector('.dsh-nb-task')?.textContent.includes('停止')`)
+  await waitFor(slow, `!document.querySelector('[data-action="stop"]') && !document.querySelector('.dsh-nb-activity[data-activity="running"]')`)
   check('停止运行保留消息且释放发送状态', await evaluate(slow, `!document.querySelector('[data-action="stop"]') && document.querySelector('.dsh-nb-message.user')`))
-  check('停止运行后粒子恢复巡游状态', await evaluate(slow, `document.querySelector('canvas.dsh-nb-particles').dataset.particleMode === 'idle'`))
+  check('停止后撤去运行提示并保留取消结果', await evaluate(slow, `window.__nbDev.store.tasks.ws1.status === 'cancelled' && !document.querySelector('.dsh-nb-activity[data-activity="running"], canvas')`))
   const emptyModels = await open('empty-models')
   check('空模型目录明确提示并禁用发送', await evaluate(emptyModels, `document.querySelector('.dsh-nb-notice')?.textContent.includes('没有可用模型') && document.querySelector('.dsh-nb-send').disabled`))
   const noSearch = await open('no-search')
@@ -178,10 +203,11 @@ try {
   await click(autoResearch, '[data-action="start-research"]')
   await waitFor(autoResearch, `document.querySelector('[data-research-status="running"]') && !document.querySelector('.dsh-nb-dialog')`)
   check('独立研究状态禁用冲突操作并提供停止', await evaluate(autoResearch, `!window.__nbDev.store.tasks.ws1 && document.querySelector('[data-action="stop"]') && document.querySelector('[aria-label="对话模型"]').disabled && document.querySelector('[data-mode="sources"]').disabled && document.querySelector('[data-action="open-add-source"]').disabled && document.querySelector('.dsh-nb-card').disabled`))
+  check('构建期间保留研究目标但不展示阶段计数与运行明细', await evaluate(autoResearch, `(() => { const research = document.querySelector('[data-research-status="running"]'); return research.textContent.includes('自动研究海洋碳汇') && !/已保存|目标 3|正在搜索|正在导入|搜索词|planning|searching|synthesizing/.test(research.textContent) && !research.querySelector('progress, details, .dsh-nb-research-queries, .dsh-nb-research-imported') && document.querySelectorAll('.dsh-nb-activity[data-activity="running"]').length === 1 })()`))
   await waitFor(autoResearch, `document.querySelector('[data-research-status="done"]')`, 8000)
-  check('自动构建按目标新建真实状态中的来源和学习指南', await evaluate(autoResearch, `(() => { const store = window.__nbDev.store, workspace = store.workspaces[0], research = store.research.ws1; return workspace.notebookId !== 'nb1' && workspace.model === 'fixture-compact' && store.notebooks.find(item => item.id === workspace.notebookId).title === '海洋碳汇自动研究' && store.sources[workspace.notebookId].length === 3 && store.sources.nb1.length === 4 && research.artifactId && document.querySelector('.dsh-nb-research').textContent.includes('已保存 3 / 目标 3') })()`))
+  check('自动构建按目标新建真实状态中的来源和学习指南', await evaluate(autoResearch, `(() => { const store = window.__nbDev.store, workspace = store.workspaces[0], research = store.research.ws1; return workspace.notebookId !== 'nb1' && workspace.model === 'fixture-compact' && store.notebooks.find(item => item.id === workspace.notebookId).title === '海洋碳汇自动研究' && store.sources[workspace.notebookId].length === 3 && store.sources.nb1.length === 4 && research.artifactId && document.querySelector('.dsh-nb-research').textContent.includes('已收录 3 份资料') })()`))
   await click(autoResearch, '.dsh-nb-research summary')
-  check('研究明细展示检索词和可打开的保存来源', await evaluate(autoResearch, `document.querySelectorAll('.dsh-nb-research-queries li').length === 2 && document.querySelectorAll('.dsh-nb-research-imported button:not(:disabled)').length === 3`))
+  check('构建结果可打开所有保存来源并在服务历史保留检索词', await evaluate(autoResearch, `window.__nbDev.store.research.ws1.queries.length === 2 && document.querySelectorAll('.dsh-nb-research-imported button:not(:disabled)').length === 3 && !document.querySelector('.dsh-nb-research-queries')`))
   await click(autoResearch, '.dsh-nb-research-imported button')
   await waitFor(autoResearch, `document.querySelector('.dsh-nb-source-body')?.textContent.includes('模拟网页正文')`)
   check('自动研究来源可检查已保存正文')
@@ -198,7 +224,7 @@ try {
   check('自动构建后可继续资料问答', await evaluate(autoResearch, `window.__nbDev.store.workspaces[0].mode === 'sources'`))
   await evaluate(autoResearch, `(() => { const research = window.__nbDev.store.research.ws1; research.reused.push(research.imported.pop()) })()`)
   await waitFor(autoResearch, `document.querySelector('.dsh-nb-research-imported')?.textContent.includes('复用已有来源')`)
-  check('复用来源合并计数且不会遗漏', await evaluate(autoResearch, `document.querySelector('.dsh-nb-research').textContent.includes('已保存 3 / 目标 3') && document.querySelectorAll('.dsh-nb-research-imported li').length === 3`))
+  check('复用来源合并计数且不会遗漏', await evaluate(autoResearch, `document.querySelector('.dsh-nb-research').textContent.includes('已收录 3 份资料') && document.querySelectorAll('.dsh-nb-research-imported li').length === 3`))
   await shot(autoResearch, 'automatic-research-complete')
   await click(autoResearch, '[data-action="notebooks"]')
   await select(autoResearch, '[aria-label="当前笔记本"]', 'nb1')
@@ -215,16 +241,17 @@ try {
   await click(partialResearch, '[data-action="start-research"]')
   await waitFor(partialResearch, `document.querySelector('[data-research-status="partial"]')`, 8000)
   await click(partialResearch, '.dsh-nb-research summary')
-  check('部分失败保留旧资料并展示真实缺口和错误', await evaluate(partialResearch, `window.__nbDev.store.workspaces[0].notebookId === 'nb1' && window.__nbDev.store.sources.nb1.length === 6 && document.querySelector('.dsh-nb-research').textContent.includes('已保存 2 / 目标 5') && document.querySelectorAll('.dsh-nb-research-failures li').length === 3 && document.querySelector('.dsh-nb-research-failures').textContent.includes('网页无法读取')`))
+  check('部分失败保留旧资料并展示真实缺口和错误', await evaluate(partialResearch, `window.__nbDev.store.workspaces[0].notebookId === 'nb1' && window.__nbDev.store.sources.nb1.length === 6 && document.querySelector('.dsh-nb-research-heading').dataset.researchCompleted === '2' && document.querySelector('.dsh-nb-research-heading').dataset.researchTarget === '5' && document.querySelector('.dsh-nb-research').textContent.includes('已收录 2 / 5 份资料') && document.querySelectorAll('.dsh-nb-research-failures li').length === 3 && document.querySelector('.dsh-nb-research-failures').textContent.includes('网页无法读取')`))
 
   const stoppedResearch = await open('research-slow')
   await click(stoppedResearch, '[data-action="open-research"]')
   await input(stoppedResearch, '[aria-label="自动构建研究目标"]', '检查构建停止后保留来源')
   await click(stoppedResearch, '[data-action="start-research"]')
-  await waitFor(stoppedResearch, `document.querySelector('.dsh-nb-research')?.textContent.includes('已保存 1 / 目标 5')`)
+  await waitFor(stoppedResearch, `window.__nbDev.store.research.ws1?.completedSources === 1 && document.querySelector('.dsh-nb-activity[data-activity="running"]')`)
+  check('构建中已入库资料不会变成实时计数面板', await evaluate(stoppedResearch, `document.querySelector('[data-research-status="running"]').textContent.includes('检查构建停止后保留来源') && !/已保存|正在导入|importing/.test(document.querySelector('[data-research-status="running"]').textContent) && !document.querySelector('[data-research-status="running"]').textContent.includes('1 / 5') && !document.querySelector('[data-research-status="running"] details')`))
   await click(stoppedResearch, '[data-action="stop"]')
   await waitFor(stoppedResearch, `document.querySelector('[data-research-status="cancelled"]')`)
-  check('停止自动构建保留已保存来源并释放运行状态', await evaluate(stoppedResearch, `document.querySelectorAll('.dsh-nb-source').length === 1 && !document.querySelector('[data-action="stop"]') && !document.querySelector('[data-action="open-research"]').disabled && document.querySelector('.dsh-nb-research').textContent.includes('已保存的来源仍可使用')`))
+  check('停止自动构建保留已保存来源并释放运行状态', await evaluate(stoppedResearch, `document.querySelectorAll('.dsh-nb-source').length === 1 && !document.querySelector('[data-action="stop"]') && !document.querySelector('[data-action="open-research"]').disabled && document.querySelector('.dsh-nb-research').textContent.includes('已保存的资料仍可使用')`))
 
   const failedResearch = await open('research-failed')
   await click(failedResearch, '[data-action="open-research"]')
@@ -242,60 +269,78 @@ try {
   const narrow = await open('ready', 420, 900)
   check('窄屏不横向溢出', await evaluate(narrow, `document.documentElement.scrollWidth <= innerWidth + 1`))
   await shot(narrow, 'workbench-mobile')
+  await beginActivity(narrow)
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] }, narrow)
-  check('减少动态效果生效', await evaluate(narrow, `getComputedStyle(document.querySelector('.dsh-nb-cloud')).animationName === 'none'`))
+  check('窄屏减少动态效果保留可访问的静态运行提示', await evaluate(narrow, `(() => { const activity = document.querySelector('.dsh-nb-activity[data-activity="running"]'); return activity?.getAttribute('aria-label') === '正在处理' && getComputedStyle(activity.querySelector('.dsh-nb-whale-animated')).display === 'none' && getComputedStyle(activity.querySelector('.dsh-nb-whale-still')).display !== 'none' })()`))
+  for (const pane of ['sources', 'studio', 'chat']) {
+    await click(narrow, '[data-pane-target="' + pane + '"]')
+    check('窄屏 ' + pane + ' 区域保留唯一运行提示', await evaluate(narrow, `(() => { const items = document.querySelectorAll('.dsh-nb-activity[data-activity="running"]'); if (items.length !== 1) return false; const rect = items[0].getBoundingClientRect(); return rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.right <= innerWidth && document.documentElement.scrollWidth <= innerWidth + 1 })()`))
+  }
 
-  const particles = await open('ready')
-  await waitFor(particles, `document.querySelector('canvas.dsh-nb-particles')?.dataset.motion === 'running'`)
-  const stage = await evaluate(particles, `(() => {
-    const canvas = document.querySelector('canvas.dsh-nb-particles')
-    window.__particleSnapshot = () => {
-      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
-      let hash = 2166136261, lit = 0
-      for (let i = 0; i < data.length; i += 16) { hash = Math.imul(hash ^ data[i] ^ data[i + 1] ^ data[i + 2] ^ data[i + 3], 16777619); if (data[i] + data[i + 1] + data[i + 2] > 80 && data[i + 3]) lit++ }
-      return { hash: hash >>> 0, lit }
-    }
-    const rect = canvas.getBoundingClientRect()
-    return { width: canvas.width, height: canvas.height, cssWidth: rect.width, cssHeight: rect.height, hidden: canvas.getAttribute('aria-hidden'), pointerEvents: getComputedStyle(canvas).pointerEvents }
+  const motion = await open('ready')
+  await send('Page.bringToFront', {}, motion)
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'prefers-color-scheme', value: 'dark' }] }, motion)
+  check('空闲工作台没有粒子画布或持续逐帧调度', await evaluate(motion, `!document.querySelector('canvas, .dsh-nb-activity[data-activity="running"]') && window.__nbRafRequests === 0`))
+  const idleToolbar = await evaluate(motion, `(() => { const rect = document.querySelector('.dsh-nb-toolbar').getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })()`)
+  await beginActivity(motion)
+  const frames = []
+  for (let index = 0; index < 6; index++) { frames.push(await activityFrame(motion)); await delay(220) }
+  report.motion = { sampledFrames: frames.length, distinctRunningFrames: new Set(frames).size }
+  check('运行提示播放真实鲸尾动效且不建立 JavaScript 逐帧循环', new Set(frames).size > 1 && await evaluate(motion, `!document.querySelector('canvas') && window.__nbRafRequests === 0`))
+  check('运行装饰不拦截操作，辅助技术只读取稳定状态', await evaluate(motion, `(() => { const activity = document.querySelector('.dsh-nb-activity[data-activity="running"]'), animated = activity.querySelector('.dsh-nb-whale-animated'), still = activity.querySelector('.dsh-nb-whale-still'); return activity.getAttribute('role') === 'status' && activity.getAttribute('aria-label') === '正在处理' && animated.closest('[aria-hidden="true"]') && still.closest('[aria-hidden="true"]') && getComputedStyle(activity).pointerEvents === 'none' && !activity.querySelector('button, input, [tabindex]') })()`))
+  check('运行提示固定槽位不改变顶栏布局', JSON.stringify(idleToolbar) === JSON.stringify(await evaluate(motion, `(() => { const rect = document.querySelector('.dsh-nb-toolbar').getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })()`)))
+  await input(motion, '[aria-label="发送给模型的消息"]', '动效不会抢走输入焦点')
+  const pointer = await evaluate(motion, `(() => { const rect = document.querySelector('.dsh-nb-activity[data-activity="running"]').getBoundingClientRect(); return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 } })()`)
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...pointer }, motion)
+  check('指针经过运行提示不改变输入焦点或草稿', await evaluate(motion, `document.activeElement === document.querySelector('[aria-label="发送给模型的消息"]') && document.activeElement.value === '动效不会抢走输入焦点'`))
+  await shot(motion, 'motion-running-dark')
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }, { name: 'prefers-color-scheme', value: 'dark' }] }, motion)
+  await waitFor(motion, `getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).display === 'none'`)
+  const reducedFrame = await activityFrame(motion)
+  await delay(450)
+  check('系统减少动态时显示静态鲸尾且裁剪帧保持不变', reducedFrame === await activityFrame(motion) && await evaluate(motion, `(() => { const still = document.querySelector('.dsh-nb-whale-still'); return getComputedStyle(still).display !== 'none' && still.getBoundingClientRect().width > 0 && getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).maskImage === 'none' && window.__nbRafRequests === 0 })()`))
+  await shot(motion, 'motion-reduced')
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'prefers-color-scheme', value: 'dark' }] }, motion)
+  await waitFor(motion, `getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).display !== 'none' && getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).maskImage !== 'none'`)
+  const restoredFrames = []
+  for (let index = 0; index < 4; index++) { restoredFrames.push(await activityFrame(motion)); await delay(250) }
+  report.motion.distinctRestoredFrames = new Set(restoredFrames).size
+  check('系统动态偏好恢复后继续播放真实鲸尾帧', new Set(restoredFrames).size > 1)
+  const darkPalette = await evaluate(motion, `(() => { const panel = getComputedStyle(document.querySelector('.dsh-nb')); return { background: panel.backgroundColor, foreground: panel.color, accent: getComputedStyle(document.querySelector('.dsh-nb-activity')).color } })()`)
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'prefers-color-scheme', value: 'light' }] }, motion)
+  // Theme transitions finish before reading enabled controls or taking the
+  // acceptance screenshot; a captured intermediate white label is misleading.
+  await waitFor(motion, `document.querySelector('.dsh-nb').getAnimations({ subtree: true }).every(animation => animation.playState !== 'running')`)
+  const lightPalette = await evaluate(motion, `(() => { const panel = getComputedStyle(document.querySelector('.dsh-nb')); return { background: panel.backgroundColor, foreground: panel.color, accent: getComputedStyle(document.querySelector('.dsh-nb-activity')).color } })()`)
+  report.themes = { dark: darkPalette, light: lightPalette }
+  check('浅色和深色主题分别适配背景文字与鲸尾颜色', darkPalette.background !== lightPalette.background && darkPalette.foreground !== lightPalette.foreground && darkPalette.foreground !== darkPalette.background && lightPalette.foreground !== lightPalette.background && lightPalette.accent !== lightPalette.background && darkPalette.accent !== darkPalette.background)
+  report.themes.lightControls = await evaluate(motion, `(() => {
+    const luminance = color => { const values = color.match(/[0-9.]+/g).slice(0, 3).map(value => Number(value) / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4); return values[0] * .2126 + values[1] * .7152 + values[2] * .0722 }
+    const background = getComputedStyle(document.querySelector('.dsh-nb')).backgroundColor, bg = luminance(background)
+    return ['.dsh-nb-source-open', '.dsh-nb-notebook-trigger', '.dsh-nb-art', '[data-action="history"]', '[data-action="new-workspace"]', '[data-action="stop"]'].map(selector => { const node = document.querySelector(selector), style = getComputedStyle(node), fg = luminance(style.color); return { selector, disabled: node.disabled, color: style.color, background, contrast: (Math.max(bg, fg) + .05) / (Math.min(bg, fg) + .05) } })
   })()`)
+  check('浅色主题可用来源标题与关键操作文字对比度至少 4.5', report.themes.lightControls.every(control => control.disabled === false && control.contrast >= 4.5))
+  await shot(motion, 'motion-running-light')
+  await evaluate(motion, `document.documentElement.style.setProperty('--dsw-alias-bg-base', 'rgb(246, 247, 249)'); document.documentElement.style.setProperty('--dsw-alias-label-primary', 'rgb(22, 31, 46)')`)
+  check('宿主主题变量优先于插件默认配色', await evaluate(motion, `getComputedStyle(document.querySelector('.dsh-nb')).backgroundColor === 'rgb(246, 247, 249)' && getComputedStyle(document.querySelector('.dsh-nb')).color === 'rgb(22, 31, 46)'`))
+  await evaluate(motion, `document.documentElement.style.removeProperty('--dsw-alias-bg-base'); document.documentElement.style.removeProperty('--dsw-alias-label-primary')`)
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-reduced-motion', value: 'no-preference' }] }, motion)
+  await waitFor(motion, `getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).display === 'none'`)
+  const forcedFrame = await activityFrame(motion)
+  await delay(450)
+  check('强制配色使用可见静态鲸尾且不依赖动画遮罩', forcedFrame === await activityFrame(motion) && await evaluate(motion, `(() => { const activity = document.querySelector('.dsh-nb-activity'), still = activity.querySelector('.dsh-nb-whale-still'); return matchMedia('(forced-colors: active)').matches && getComputedStyle(still).display !== 'none' && still.getBoundingClientRect().width > 0 && getComputedStyle(activity.querySelector('.dsh-nb-whale-animated')).maskImage === 'none' && getComputedStyle(activity).color !== getComputedStyle(document.querySelector('.dsh-nb')).backgroundColor })()`))
+  await evaluate(motion, `document.querySelector('[data-action="more"]').focus()`)
+  check('强制配色保留键盘操作的可见焦点轮廓', await evaluate(motion, `(() => { const control = document.querySelector('[data-action="more"]'), style = getComputedStyle(control); return document.activeElement === control && control.matches(':focus-visible') && style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0 })()`))
+  await shot(motion, 'motion-forced-colors')
+  await send('Emulation.setEmulatedMedia', { features: [] }, motion)
+  await click(motion, '[data-action="stop"]')
+  await waitFor(motion, `!document.querySelector('.dsh-nb-activity[data-activity="running"]')`)
+  check('空闲时没有隐藏的播放遮罩或逐帧任务', await evaluate(motion, `!document.querySelector('.dsh-nb-whale-animated') && !document.querySelector('canvas') && window.__nbRafRequests === 0`))
+  report.motion.rafRequests = await evaluate(motion, `window.__nbRafRequests`)
+  await shot(motion, 'motion-idle')
+  await evaluate(motion, `window.ReactDOM.render(null, document.getElementById('app'))`)
   await delay(180)
-  const beforeMotion = await evaluate(particles, `window.__particleSnapshot()`)
-  await delay(320)
-  const afterMotion = await evaluate(particles, `window.__particleSnapshot()`)
-  check('空态画布绘制可见粒子并持续运动', stage.width > 0 && stage.height > 0 && beforeMotion.lit > 30 && beforeMotion.hash !== afterMotion.hash)
-  check('粒子装饰不拦截表单或辅助技术', stage.hidden === 'true' && stage.pointerEvents === 'none')
-  check('画布按设备像素比设限', stage.width / stage.cssWidth <= 2.01 && stage.height / stage.cssHeight <= 2.01)
-  await input(particles, '[aria-label="发送给模型的消息"]', '粒子不会抢走输入焦点')
-  const pointer = await evaluate(particles, `(() => { const rect = document.querySelector('canvas.dsh-nb-particles').getBoundingClientRect(); return { x: rect.x + rect.width * .6, y: rect.y + rect.height * .55 } })()`)
-  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...pointer }, particles)
-  check('指针扰动不改变输入焦点或草稿', await evaluate(particles, `document.activeElement === document.querySelector('[aria-label="发送给模型的消息"]') && document.activeElement.value === '粒子不会抢走输入焦点'`))
-  await shot(particles, 'particles-idle')
-  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] }, particles)
-  await waitFor(particles, `document.querySelector('canvas.dsh-nb-particles').dataset.motion === 'reduced'`)
-  await delay(180)
-  const reducedFrame = await evaluate(particles, `window.__particleSnapshot()`)
-  await delay(320)
-  check('减少动态效果时保留静态粒子且停止逐帧运动', reducedFrame.lit > 30 && reducedFrame.hash === (await evaluate(particles, `window.__particleSnapshot()`)).hash)
-  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] }, particles)
-  await waitFor(particles, `document.querySelector('canvas.dsh-nb-particles').dataset.motion === 'running'`)
-  check('动态效果设置恢复后继续播放')
-  await evaluate(particles, `document.querySelector('.dsh-nb-sea').style.display = 'none'`)
-  await waitFor(particles, `document.querySelector('canvas.dsh-nb-particles').dataset.motion === 'paused'`)
-  check('不可见粒子场暂停绘制')
-  await evaluate(particles, `document.querySelector('.dsh-nb-sea').style.removeProperty('display')`)
-  await waitFor(particles, `document.querySelector('canvas.dsh-nb-particles').dataset.motion === 'running'`)
-  await evaluate(particles, `(() => { const ctx = document.querySelector('canvas.dsh-nb-particles').getContext('2d'), clear = ctx.clearRect.bind(ctx); window.__particlePaints = 0; ctx.clearRect = (...args) => { window.__particlePaints++; return clear(...args) } })()`)
-  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 2, y: 2 }, particles)
-  await delay(1000)
-  await evaluate(particles, 'window.__particlePaints = 0')
-  await delay(700)
-  const paints = await evaluate(particles, `window.__particlePaints`)
-  check('持续绘制保持约 30fps 帧率上限', paints > 0 && paints <= 25)
-  await evaluate(particles, `(() => { const request = window.requestAnimationFrame.bind(window), cancel = window.cancelAnimationFrame.bind(window); window.__particleRafs = new Set(); window.requestAnimationFrame = fn => { const id = request(time => { window.__particleRafs.delete(id); fn(time) }); window.__particleRafs.add(id); return id }; window.cancelAnimationFrame = id => { window.__particleRafs.delete(id); cancel(id) } })()`)
-  await delay(180)
-  await evaluate(particles, `window.ReactDOM.render(null, document.getElementById('app'))`)
-  await delay(180)
-  check('离开工作台清理粒子动画调度', await evaluate(particles, `!document.querySelector('canvas.dsh-nb-particles') && window.__particleRafs.size === 0`))
+  check('离开工作台清理状态提示且无遗留动画调度', await evaluate(motion, `!document.querySelector('.dsh-nb-activity, canvas') && window.__nbRafRequests === 0`))
 
   const layout = await open('ready', 1100, 800)
   check('常态顶栏只有一行且模型选择位于输入框', await evaluate(layout, `document.querySelector('.dsh-nb-toolbar').getBoundingClientRect().height <= 64 && !!document.querySelector('.dsh-nb-composer .dsh-nb-model-select') && !document.querySelector('.dsh-nb-toolbar select')`))
@@ -383,10 +428,20 @@ try {
   await click(layout, '[data-pane-target="sources"]')
   check('窄屏只显示当前区域并可添加来源', await evaluate(layout, `getComputedStyle(document.querySelector('.is-sources')).display === 'flex' && getComputedStyle(document.querySelector('.is-studio')).display === 'none' && !document.querySelector('[data-action="open-add-source"]').disabled && document.documentElement.scrollWidth <= innerWidth`))
   await click(layout, '[data-pane-target="chat"]')
+  await beginActivity(layout)
   await click(layout, '[data-action="more"]'); await click(layout, '[data-action="motion"]')
-  await waitFor(layout, `document.querySelector('.dsh-nb-particles').dataset.motion === 'reduced'`)
-  check('用户可关闭粒子动态并保存偏好', await evaluate(layout, `JSON.parse(localStorage.getItem('dsh-notebook.presentation.v1')).motion === false`))
+  await waitFor(layout, `document.querySelector('.dsh-nb-whale')?.dataset.motion === 'static'`)
+  const userStaticFrame = await activityFrame(layout)
+  await delay(450)
+  check('用户关闭动态后静态提示仍在并保存偏好', userStaticFrame === await activityFrame(layout) && await evaluate(layout, `JSON.parse(localStorage.getItem('dsh-notebook.presentation.v1')).motion === false && getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).maskImage === 'none' && getComputedStyle(document.querySelector('.dsh-nb-whale-still')).display !== 'none'`))
+  await send('Page.reload', {}, layout)
+  await waitFor(layout, `document.querySelector('.dsh-nb-workbench')?.dataset.workspaceId`)
+  await beginActivity(layout)
+  check('重新打开工作台仍遵循用户关闭动态的偏好', await evaluate(layout, `document.querySelector('.dsh-nb-whale').dataset.motion === 'static' && getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).display === 'none' && getComputedStyle(document.querySelector('.dsh-nb-whale-still')).display !== 'none'`))
   await click(layout, '[data-action="more"]'); await click(layout, '[data-action="motion"]')
+  await waitFor(layout, `document.querySelector('.dsh-nb-whale')?.dataset.motion === 'running'`)
+  check('用户重新开启动态后恢复播放与偏好', await evaluate(layout, `JSON.parse(localStorage.getItem('dsh-notebook.presentation.v1')).motion === true && getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).maskImage !== 'none'`))
+  await click(layout, '[data-action="stop"]')
 
   const practice = await open('study')
   await openPractice(practice, 'aq1')
@@ -475,7 +530,7 @@ try {
 
   const unauthenticated = await open('unauthenticated', 1100, 800)
   await delay(100)
-  check('相同登录错误仅保留一条且不假装思考', await evaluate(unauthenticated, `document.querySelectorAll('.dsh-nb-status').length === 1 && document.querySelector('.dsh-nb-particles').dataset.particleMode === 'idle'`))
+  check('相同登录错误仅保留一条且不假装思考', await evaluate(unauthenticated, `document.querySelectorAll('.dsh-nb-status').length === 1 && !document.querySelector('.dsh-nb-activity[data-activity="running"], canvas') && window.__nbRafRequests === 0`))
   check('宿主认证失败时不降级到旧的直连 HTTP 接口', await evaluate(unauthenticated, `window.__nbDev.requests.length > 0 && window.__nbDev.requests.every(item => item.rpc)`))
   await shot(unauthenticated, 'workbench-login-required')
   await evaluate(unauthenticated, `window.__nbDev.setAuthenticated(true)`)
@@ -493,7 +548,7 @@ try {
   console.error(JSON.stringify(report, null, 2))
   process.exitCode = 1
 } finally {
-  if (ws) { try { await send('Browser.close') } catch {} ws.close() }
+  if (ws) { try { await send('Browser.close', {}, undefined, 1000) } catch {} ws.close() }
   chrome.kill('SIGKILL')
   server.close()
   await delay(100)

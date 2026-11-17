@@ -14,7 +14,8 @@
     "src",
     "cordis.patch.yml",
     "package.json",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "engines": {
     "node": ">=24.9.0",
@@ -49,7 +50,8 @@
     "test": "node --test test/*.test.js",
     "dev": "node dev/serve.mjs",
     "test:ui": "node dev/check.mjs",
-    "preview:particles": "node dev/record-particles.mjs"
+    "preview:particles": "node dev/record-particles.mjs",
+    "preview:motion": "node dev/record-particles.mjs"
   },
   "dependencies": {
     "linkedom": "0.18.14"
