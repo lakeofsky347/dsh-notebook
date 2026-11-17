@@ -149,6 +149,22 @@ test('native stream settles into one assistant row and reuses its owned Agent', 
   assert.equal(f.library.getWorkspace(f.workspace.id).mode, 'sources')
 })
 
+test('native context injections stay in native history and research instructions stay out of the UI projection', async t => {
+  const f = fixture(t, { run: async ({ message, event, answer }) => {
+    assert.equal(message.content[0].text, 'Internal workflow instructions\nResearch copper')
+    event('user/message', { id: 'time-context', role: 'user', source: { kind: 'time-context', form: 'snapshot' }, content: [{ type: 'text', text: '<system-reminder>clock and settings</system-reminder>' }] })
+    event('user/message', { id: 'runtime-context', role: 'user', source: { kind: 'runtime-context', form: 'snapshot' }, content: [{ type: 'text', text: 'non-user input' }] })
+    answer('Saved evidence')
+  } })
+  await f.runtime.start(f.workspace.id, 'Internal workflow instructions\nResearch copper', route, 'research', { displayText: 'Research copper' })
+  await settled(f.runtime, f.workspace.id)
+  const rows = f.library.listMessages(f.workspace.id)
+  assert.deepEqual(rows.map(row => [row.role, row.text]), [['user', 'Research copper'], ['assistant', 'Saved evidence']])
+  assert.deepEqual(rows[0].content, [{ type: 'text', text: 'Research copper' }])
+  assert.equal(rows[0].metadata.displayText, 'Research copper')
+  assert.equal(f.native.logs.get(f.workspace.id).filter(event => event.type === 'user/message').length, 3)
+})
+
 test('tool call/result update one progress row and preserve native correlation', async t => {
   let changed = 0
   const f = fixture(t, { run: async ({ turn, event, step, answer }) => {
@@ -188,6 +204,20 @@ test('prepare creates a native owner without creating task or conversational mes
   await f.runtime.start(f.workspace.id, '现在开始')
   assert.equal((await settled(f.runtime, f.workspace.id)).status, 'done')
   assert.equal(f.native.calls.create, 1)
+})
+
+test('cancel during native preparation prevents a later task or message from starting', async t => {
+  let entered, release
+  const preparing = new Promise(resolve => { entered = resolve })
+  const blocked = new Promise(resolve => { release = resolve })
+  const f = fixture(t, {}, { async setupAgent() { entered(); await blocked } })
+  const pending = f.runtime.prepare(f.workspace.id, route)
+  await preparing
+  f.runtime.cancel(f.workspace.id)
+  release()
+  await assert.rejects(pending, /已停止/)
+  assert.equal(f.runtime.task(f.workspace.id), null)
+  assert.deepEqual(f.library.listMessages(f.workspace.id), [])
 })
 
 test('route validation and concurrent start reservations reject before native creation', async t => {
@@ -250,7 +280,7 @@ test('resume uses native history and idempotently repairs missed SQLite projecti
   const id = f.workspace.id
   f.library.appendMessage(id, { role: 'assistant', text: 'old prefix', status: 'streaming', metadata: { nativeSessionId: id, attemptId: 'old-attempt', turn: 1, step: 1 } })
   f.native.logs.set(id, [
-    { seq: 0, type: 'user/message', data: { id: 'old-user', role: 'user', content: [{ type: 'text', text: 'old question' }] } },
+    { seq: 0, type: 'user/message', data: { id: 'old-user', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'old question' }] } },
     { seq: 1, type: 'assistant/message', data: { turn: 1, step: 1, message: { id: 'old-answer', role: 'assistant', source: { provider: 'mock', model: 'first' }, content: [{ type: 'text', text: 'old completed answer' }] } } },
   ])
   await f.runtime.start(id, 'continue')

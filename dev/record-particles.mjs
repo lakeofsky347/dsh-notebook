@@ -144,7 +144,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false }, sessionId)
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] }, sessionId)
   await send('Page.navigate', { url: base + '/dev/preview.html?scene=ready&chrome=0' }, sessionId)
-  await poll(() => evaluate(sessionId, `window.__nbDev && document.querySelector('.dsh-nb-workspaces')?.value && !document.querySelector('.dsh-nb-message')`))
+  await poll(() => evaluate(sessionId, `window.__nbDev && document.querySelector('.dsh-nb-workbench')?.dataset.workspaceId && !document.querySelector('.dsh-nb-message')`))
   await poll(() => evaluate(sessionId, `(() => { const canvas = document.querySelector('canvas.dsh-nb-particles'); if (!canvas) return false; const rect = canvas.getBoundingClientRect(); return rect.width > 0 && rect.height > 0 && getComputedStyle(canvas).visibility !== 'hidden' && canvas.dataset.motion === 'running'; })()`))
   await delay(450)
   const geometry = await evaluate(sessionId, `(() => { const main = document.querySelector('.dsh-nb-col.is-main').getBoundingClientRect(); const canvas = document.querySelector('canvas.dsh-nb-particles').getBoundingClientRect(); const rect = value => ({ x: value.x, y: value.y, width: value.width, height: value.height }); return { main: rect(main), canvas: rect(canvas), attributes: {...document.querySelector('canvas.dsh-nb-particles').dataset} }; })()`)
@@ -212,7 +212,7 @@ try {
   report.gifEncoding = gifEncoding
   // A fixed running task is fixture data, not a real model run. It gives a second
   // still of the same live canvas without adding fabricated animation frames.
-  await evaluate(sessionId, `(() => { const id = document.querySelector('.dsh-nb-workspaces').value; window.__nbDev.store.messages[id] = []; window.__nbDev.store.tasks[id] = { id: 'particle-recording-fixture', workspaceId: id, status: 'running', phase: 'tool:web_search', provider: 'dev-local', model: 'fixture-research', startedAt: Date.now() }; })()`)
+  await evaluate(sessionId, `(() => { const id = document.querySelector('.dsh-nb-workbench').dataset.workspaceId; window.__nbDev.store.messages[id] = []; window.__nbDev.store.tasks[id] = { id: 'particle-recording-fixture', workspaceId: id, status: 'running', phase: 'tool:web_search', provider: 'dev-local', model: 'fixture-research', startedAt: Date.now() }; })()`)
   await poll(() => evaluate(sessionId, `document.querySelector('[data-action="stop"]') && document.querySelector('canvas.dsh-nb-particles')?.dataset.motion === 'running'`))
   await delay(350)
   const runningRaw = join(temporaryDir, 'research-running.png')

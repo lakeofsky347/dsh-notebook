@@ -136,6 +136,7 @@
     })
     dom.addEventListener('submit', (event) => call('onSubmit', event))
     dom.addEventListener('keydown', (event) => call('onKeyDown', event))
+    dom.addEventListener('toggle', (event) => call('onToggle', event))
   }
 
   function applyProps(dom, props) {

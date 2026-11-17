@@ -26,6 +26,152 @@ function tempLib(deps = {}, overrides = {}) {
   return { dir, library }
 }
 
+test('host web documents preserve fetched text, final URL and truncation, and deduplicate anchors', t => {
+  const { dir, library } = tempLib({}, { maxUrlBytes: 1000, maxUploadBytes: 1000, maxWordsPerSource: 100 })
+  t.after(() => { library.close(); rmSync(dir, { recursive: true, force: true }) })
+  const notebook = library.createNotebook({ title: 'Research' })
+  const input = { url: 'https://example.org/article#one', requestedUrl: 'https://example.org/redirect', truncated: true,
+    body: { kind: 'html', content: '<html><head><title>Real title</title></head><body><article>Copper conducts electricity.</article><script>bad()</script></body></html>' } }
+  const source = library.addWebDocument(notebook.id, input)
+  assert.equal(source.locator, 'https://example.org/article')
+  assert.equal(source.title, 'Real title')
+  assert.equal(source.provenance.via, 'dsh-web-fetch')
+  assert.equal(source.provenance.requestedUrl, input.requestedUrl)
+  assert.equal(source.provenance.truncated, true)
+  assert.ok(source.provenance.fetchedAt > 0)
+  assert.equal(library.getSource(notebook.id, source.id).body, 'Copper conducts electricity.')
+  assert.equal(library.addWebDocument(notebook.id, { ...input, url: 'https://example.org/article#two' }).id, source.id)
+  assert.equal(library.listSources(notebook.id).length, 1)
+  assert.equal(library.setSources(notebook.id, [{ id: source.id, enabled: false }])[0].provenance.truncated, true)
+})
+
+test('web document import rejects unsupported, empty and oversized bodies and credential URLs', t => {
+  const { dir, library } = tempLib()
+  t.after(() => { library.close(); rmSync(dir, { recursive: true, force: true }) })
+  const notebook = library.createNotebook({ title: 'Research' })
+  const input = { url: 'https://example.org', body: { kind: 'text', content: 'valid text' } }
+  assert.throws(() => library.addWebDocument(notebook.id, { ...input, url: 'https://user:secret@example.org' }), /credential-free/)
+  assert.throws(() => library.addWebDocument(notebook.id, { ...input, body: { kind: 'pdf', content: 'file' } }), /unsupported/)
+  assert.throws(() => library.addWebDocument(notebook.id, { ...input, body: { kind: 'text', content: ' ' } }), /empty/)
+  assert.throws(() => library.addWebDocument(notebook.id, { ...input, body: { kind: 'text', content: 'x'.repeat(101) } }), /download limit/)
+  assert.equal(library.listSources(notebook.id).length, 0)
+})
+
+test('host web import rejects a challenge shell and removes invisible evidence from saved text', t => {
+  const { dir, library } = tempLib({}, { maxUrlBytes: 2000, maxUploadBytes: 2000, maxWordsPerSource: 200 })
+  t.after(() => { library.close(); rmSync(dir, { recursive: true, force: true }) })
+  const notebook = library.createNotebook({ title: 'Research' })
+  const url = 'https://example.org/article'
+  assert.throws(() => library.addWebDocument(notebook.id, { url, body: { kind: 'html', content: '<html><head><title>Just a moment...</title></head><body><div id="challenge-running">Checking your browser. Verify you are human.</div></body></html>' } }), /人机验证页面/)
+  assert.equal(library.listSources(notebook.id).length, 0)
+  const source = library.addWebDocument(notebook.id, { url, body: { kind: 'html', content: '<html><body><main><p style="display:none">Hidden claim.</p><object>Embedded claim.</object><p>Visible evidence.</p></main></body></html>' } })
+  assert.equal(library.getSource(notebook.id, source.id).body, 'Visible evidence.')
+})
+
+test('research passages find later topic evidence and distribute results across requested enabled sources', t => {
+  const { dir, library } = tempLib({}, { maxSourcesPerNotebook: 5, maxUploadBytes: 10000, maxWordsPerSource: 1000, chunkChars: 220 })
+  t.after(() => { library.close(); rmSync(dir, { recursive: true, force: true }) })
+  const notebook = library.createNotebook({ title: 'Ocean' })
+  const other = library.createNotebook({ title: 'Other notebook' })
+  const first = library.addText(notebook.id, 'First', 'Title\n\n' + Array.from({ length: 8 }, (_, i) => 'Navigation ' + i).join('\n\n') + '\n\nBiological carbon pump evidence: photosynthesis fixes dissolved carbon, and sinking particles transport it into deep water. Remineralization limits how much remains stored.\n\nBiological carbon pump measurements require sediment traps and carbon flux observations.')
+  const second = library.addText(notebook.id, 'Second', 'Publication\n\nAuthor\n\nCarbon pump observations compare particle transport with remineralization. Independent field measurements constrain estimates of carbon storage.')
+  const outside = library.addText(notebook.id, 'Not part of this research', 'Carbon pump outside research.')
+  const disabled = library.addText(notebook.id, 'Disabled', 'Carbon pump disabled.')
+  library.setSources(notebook.id, [{ id: disabled.id, enabled: false }])
+  library.addText(other.id, 'Other', 'Carbon pump other notebook.')
+  const requested = new Set([first.id, second.id, disabled.id])
+  const passages = library.researchPassages(notebook.id, 'biological carbon pump remineralization', 4, requested)
+  assert.equal(passages[0].sourceId, first.id)
+  assert.ok(passages[0].ordinal >= 9)
+  assert.match(passages[0].text, /Biological carbon pump/)
+  assert.ok(passages.some(item => item.sourceId === first.id && item.text.includes('sinking particles')))
+  assert.equal(passages[1].sourceId, second.id)
+  assert.ok(passages.every(item => item.matched && [first.id, second.id].includes(item.sourceId)))
+  assert.ok(!passages.some(item => item.sourceId === outside.id))
+  assert.equal(new Set(passages.slice(0, 2).map(item => item.sourceId)).size, 2)
+})
+
+test('research passages expand short matching headings without repeating adjacent chunks', t => {
+  const { dir, library } = tempLib({}, { maxUploadBytes: 2000, maxWordsPerSource: 200, chunkChars: 400 })
+  t.after(() => { library.close(); rmSync(dir, { recursive: true, force: true }) })
+  const notebook = library.createNotebook({ title: 'Plants' })
+  const source = library.addText(notebook.id, 'Mechanism', 'Photosynthesis\n\nPlants capture sunlight and convert water and carbon dioxide into stored chemical energy. This process provides the foundation of many food webs.\n\nPhotosynthesis measurements compare oxygen production and gas exchange under controlled light levels.')
+  const passages = library.researchPassages(notebook.id, 'photosynthesis', 5, new Set([source.id]))
+  assert.match(passages[0].text, /Plants capture sunlight/)
+  assert.deepEqual(passages[0].ordinals, [0, 1, 2])
+  assert.equal(passages.length, 1)
+  assert.equal(passages[0].ordinal, 0)
+})
+
+test('long research requests retain named APIs and their explanations across sources', t => {
+  const { dir, library } = tempLib({}, { maxSourcesPerNotebook: 3, maxUploadBytes: 20000, maxWordsPerSource: 2000, chunkChars: 220 })
+  t.after(() => { library.close(); rmSync(dir, { recursive: true, force: true }) })
+  const notebook = library.createNotebook({ title: 'Structured concurrency' })
+  const separator = 'Background reading discusses application design, scheduling and resource ownership. '.repeat(4)
+  const task = library.addText(notebook.id, 'Tasks', [
+    'Python asyncio Python asyncio overview. Python asyncio examples for Python learners.',
+    ...Array.from({ length: 6 }, (_, i) => 'Python asyncio generic overview ' + i + '. Python applications can use asyncio coroutines.'),
+    'TerminateTaskGroup TerminateTaskGroup TerminateTaskGroup is a user-defined helper name.',
+    '- class asyncio.TaskGroup¶',
+    'A group waits for all tasks on exit. If one task fails, the remaining tasks in the group are cancelled.',
+    separator,
+    'CancelledError is raised on cancellation. Use try/finally for clean-up and propagate the exception after cleanup.',
+    separator,
+    'future.result(timeout=2) accepts a timeout argument. timeout timeout timeout.',
+    separator,
+    '- asyncio.timeout(delay)¶',
+    'An asynchronous context manager cancels overdue work and converts cancellation to TimeoutError. Catch TimeoutError outside of the context manager.',
+  ].join('\n\n'))
+  const sync = library.addText(notebook.id, 'Synchronization', 'Python asyncio synchronization methods do not accept timeout. Use wait_for instead.\n\nA lock serializes access to shared state.')
+  const runner = library.addText(notebook.id, 'Runners', '- class asyncio.Runner¶\n\nA Runner owns the event loop and closes resources on exit. Python asyncio applications can reuse this context.')
+  const passages = library.researchPassages(notebook.id, '学习 Python asyncio 结构化并发，重点理解 TaskGroup、CancelledError 和 timeout。覆盖 Runner 和同步原语。为 Python 基础学习者整理 Python 官方文档。', 8)
+  assert.deepEqual(new Set(passages.slice(0, 3).map(passage => passage.sourceId)), new Set([task.id, sync.id, runner.id]))
+  const taskPassages = passages.filter(passage => passage.sourceId === task.id)
+  const text = taskPassages.map(passage => passage.text).join('\n\n')
+  assert.match(text, /remaining tasks in the group are cancelled/)
+  assert.match(text, /try\/finally for clean-up and propagate/)
+  assert.match(text, /asyncio\.timeout\(delay\)/)
+  assert.match(text, /outside of the context manager/)
+  const ordinals = taskPassages.flatMap(passage => passage.ordinals)
+  assert.equal(new Set(ordinals).size, ordinals.length)
+})
+
+test('research API lookup prefers a definition over an incidental argument with repeated keyword hits', t => {
+  const { dir, library } = tempLib({}, { maxUploadBytes: 2000, maxWordsPerSource: 200, chunkChars: 200 })
+  t.after(() => { library.close(); rmSync(dir, { recursive: true, force: true }) })
+  const notebook = library.createNotebook({ title: 'API lookup' })
+  library.addText(notebook.id, 'API', 'future.result(timeout=2) uses timeout. timeout timeout.\n\n- class asyncio.Timeout¶\n\nThis class implements a timer.\n\n- asyncio.timeout(delay)¶\n\nCancel overdue work and convert the cancellation to TimeoutError. Catch it outside the context manager.')
+  const [passage] = library.researchPassages(notebook.id, 'timeout', 1)
+  assert.ok(passage.text.startsWith('- asyncio.timeout(delay)'))
+  assert.match(passage.text, /Catch it outside the context manager/)
+})
+
+test('research passage fallback prefers substantive text and reports no keyword match', t => {
+  const { dir, library } = tempLib({}, { maxUploadBytes: 2000, maxWordsPerSource: 200, chunkChars: 400 })
+  t.after(() => { library.close(); rmSync(dir, { recursive: true, force: true }) })
+  const notebook = library.createNotebook({ title: 'Fallback' })
+  const source = library.addText(notebook.id, 'A source', 'Index\n\nUpdated yesterday\n\nThe body contains a substantive explanation with several details that are useful for understanding the overall subject even when the wording of a question does not match.')
+  const passages = library.researchPassages(notebook.id, 'unmatched-query-zebra', 1, new Set([source.id]))
+  assert.equal(passages[0].matched, false)
+  assert.equal(passages[0].ordinal, 2)
+  assert.match(passages[0].text, /substantive explanation/)
+  assert.deepEqual(library.researchPassages(notebook.id, 'body', 0), [])
+  assert.deepEqual(library.researchPassages(notebook.id, 'body', 2, new Set()), [])
+  assert.throws(() => library.researchPassages(notebook.id, 'body', -1), /non-negative integer/)
+})
+
+test('cancelled URL imports cannot write a body even when the fetch implementation ignores cancellation', async t => {
+  const controller = new AbortController()
+  const { dir, library } = tempLib({ fetch: async () => {
+    controller.abort(new Error('user stopped'))
+    return { ok: true, headers: new Headers({ 'content-type': 'text/plain' }), arrayBuffer: async () => Buffer.from('Copper evidence') }
+  } })
+  t.after(() => { library.close(); rmSync(dir, { recursive: true, force: true }) })
+  const notebook = library.createNotebook({ title: 'Research' })
+  await assert.rejects(library.addUrl(notebook.id, 'https://example.org', controller.signal), /user stopped/)
+  assert.equal(library.listSources(notebook.id).length, 0)
+})
+
 test('notebooks do not share sources', () => {
   const { dir, library } = tempLib()
   try {

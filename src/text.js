@@ -124,10 +124,13 @@ export function renderContext(notebook, passages, maxChars) {
       ? 'Style: follow the notebook instructions as the voice of the answer.'
       : 'Style: default research assistant.'
   const groundingLine = notebook.grounding === 'sources-only'
-    ? 'Grounding: sources-only. Answer only from the passages below. If they do not contain the answer, say the notebook does not contain it. Do not use outside knowledge.'
+    ? 'Grounding: sources-only. Answer only from the passages below. If insufficient, search/read selected sources; say when the evidence remains insufficient. Do not use outside knowledge.'
     : 'Grounding: sources plus tools. Prefer these passages and cite source ids. Other tools may add to them.'
-  // Preserve grounding and answer instructions before optional metadata or passages.
+  const citationLine = '引用：每项有依据的事实后写 [sourceId]，将 sourceId 替换为片段中真实完整 ID；重复引用也写全，不用短 ID、片段编号、“同源”或“同上”。'
+  // Preserve grounding and citation rules before optional style, custom
+  // instructions, metadata, or passages, within the same total budget.
   if (!append(groundingLine)) return context
+  if (!append(citationLine)) return context
   if (!append(styleLine)) return context
   if (notebook.instructions.trim() !== '') {
     if (!append('Instructions:\n' + notebook.instructions.trim(), '\n\n')) return context

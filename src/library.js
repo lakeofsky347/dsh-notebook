@@ -4,6 +4,7 @@ import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { assertText, chunkText, hashText, isTextPath, rankChunks, wordCount } from './text.js'
 import { extractUrlDocument } from './url-text.js'
+import { createStudyStore } from './study.js'
 
 export const SOURCE_KINDS = ['file', 'text', 'url', 'note']
 export const ARTIFACT_KINDS = ['report', 'study-guide', 'briefing', 'flashcards', 'quiz', 'mind-map', 'data-table']
@@ -151,6 +152,9 @@ export function openLibrary(file, limits, deps = {}) {
   const db = new DatabaseSync(file)
   db.exec('PRAGMA foreign_keys = ON')
   db.exec(SCHEMA)
+  if (!db.prepare('PRAGMA table_info(sources)').all().some(column => column.name === 'provenance')) {
+    db.exec("ALTER TABLE sources ADD COLUMN provenance TEXT NOT NULL DEFAULT '{}'")
+  }
   const readFile = deps.readFile ?? ((path) => readFileSync(path))
   const stat = deps.stat ?? ((path) => statSync(path))
   const fetchImpl = deps.fetch ?? globalThis.fetch
@@ -165,8 +169,8 @@ export function openLibrary(file, limits, deps = {}) {
   }
   const sourceStmt = {
     count: db.prepare('SELECT COUNT(*) AS n FROM sources WHERE notebook_id = ?'),
-    insert: db.prepare('INSERT INTO sources (id, notebook_id, kind, title, locator, body, enabled, label, status, content_hash, word_count, error, mtime_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
-    list: db.prepare('SELECT id, notebook_id, kind, title, locator, enabled, label, status, content_hash, word_count, error, mtime_ms, created_at FROM sources WHERE notebook_id = ? ORDER BY created_at ASC'),
+    insert: db.prepare('INSERT INTO sources (id, notebook_id, kind, title, locator, body, enabled, label, status, content_hash, word_count, error, mtime_ms, created_at, provenance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
+    list: db.prepare('SELECT id, notebook_id, kind, title, locator, enabled, label, status, content_hash, word_count, error, mtime_ms, created_at, provenance FROM sources WHERE notebook_id = ? ORDER BY created_at ASC'),
     get: db.prepare('SELECT * FROM sources WHERE id = ?'),
     byNotebook: db.prepare('SELECT * FROM sources WHERE notebook_id = ? ORDER BY created_at ASC, rowid ASC'),
     updateBody: db.prepare('UPDATE sources SET body = ?, status = ?, content_hash = ?, word_count = ?, error = ?, mtime_ms = ?, title = ? WHERE id = ?'),
@@ -283,7 +287,7 @@ export function openLibrary(file, limits, deps = {}) {
     const now = Date.now()
     db.exec('BEGIN')
     try {
-      sourceStmt.insert.run(id, notebookId, fields.kind, fields.title, fields.locator ?? '', fields.body, fields.enabled === false ? 0 : 1, fields.label ?? '', 'ready', hash, words, '', fields.mtimeMs ?? 0, now)
+      sourceStmt.insert.run(id, notebookId, fields.kind, fields.title, fields.locator ?? '', fields.body, fields.enabled === false ? 0 : 1, fields.label ?? '', 'ready', hash, words, '', fields.mtimeMs ?? 0, now, jsonValue(fields.provenance, 'provenance', {}))
       replaceChunks(id, chunkText(fields.body, limits.chunkChars, limits.chunkOverlap))
       notebookStmt.touch.run(now, notebookId)
       db.exec('COMMIT')
@@ -309,6 +313,7 @@ export function openLibrary(file, limits, deps = {}) {
       wordCount: row.word_count,
       error: row.error,
       createdAt: row.created_at,
+      provenance: JSON.parse(row.provenance || '{}'),
     }
   }
 
@@ -375,6 +380,7 @@ export function openLibrary(file, limits, deps = {}) {
 
   return {
     file,
+    ...createStudyStore(db, { refreshSources: notebookId => sourceStmt.byNotebook.all(notebookId).map(refreshFile) }),
     createWorkspace({ title = '新对话', provider = '', model = '', mode = 'research' } = {}) {
       const name = String(title).trim()
       if (name === '') throw fail('title is required')
@@ -492,7 +498,34 @@ export function openLibrary(file, limits, deps = {}) {
       const base = path.split('/').pop()
       return storeBody(notebookId, { kind: 'file', title: base, body, locator: path, mtimeMs: info.mtimeMs })
     },
-    async addUrl(notebookId, url) {
+    addWebDocument(notebookId, document) {
+      requireNotebook(notebookId)
+      const canonical = value => {
+        let url
+        try { url = new URL(value) } catch { throw fail('invalid url') }
+        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw fail('only credential-free http(s) urls are accepted')
+        url.hash = ''
+        return url.href
+      }
+      const url = canonical(document.url)
+      const requestedUrl = canonical(document.requestedUrl || url)
+      if (!['html', 'text'].includes(document.body?.kind) || typeof document.body.content !== 'string') throw fail('unsupported web document body')
+      if (Buffer.byteLength(document.body.content) > limits.maxUrlBytes) throw fail('url exceeds the download limit')
+      assertText(document.body.content)
+      const extracted = extractUrlDocument(document.body.content, document.body.kind === 'html' ? 'text/html' : 'text/plain', url)
+      if (!extracted.body.trim()) throw fail('url document is empty')
+      const duplicate = sourceStmt.byNotebook.all(notebookId).find(row => {
+        if (row.kind !== 'url' || row.status !== 'ready') return false
+        try { return [url, requestedUrl].includes(canonical(row.locator)) } catch { return false }
+      })
+      if (duplicate) return { ...publicSource(duplicate), reused: true }
+      return storeBody(notebookId, {
+        kind: 'url', title: document.body.kind === 'html' ? extracted.title : String(document.title || extracted.title),
+        body: extracted.body, locator: url,
+        provenance: { via: 'dsh-web-fetch', requestedUrl, fetchedAt: Date.now(), truncated: document.truncated === true },
+      })
+    },
+    async addUrl(notebookId, url, signal) {
       requireNotebook(notebookId)
       let parsed
       try { parsed = new URL(String(url)) } catch { throw fail('invalid url') }
@@ -500,7 +533,9 @@ export function openLibrary(file, limits, deps = {}) {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), limits.urlTimeoutMs)
       try {
-        const response = await fetchImpl(parsed.href, { signal: controller.signal, redirect: 'follow' })
+        const combined = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+        combined.throwIfAborted()
+        const response = await fetchImpl(parsed.href, { signal: combined, redirect: 'follow' })
         if (!response.ok) throw fail('url returned ' + response.status)
         const type = String(response.headers.get('content-type') ?? '')
         if (type !== '' && !/^text\//.test(type) && !type.includes('json') && !type.includes('xml')) {
@@ -510,6 +545,7 @@ export function openLibrary(file, limits, deps = {}) {
         const raw = bytes.toString('utf8')
         assertText(raw)
         const { body, title } = extractUrlDocument(raw, type, parsed.href)
+        combined.throwIfAborted()
         if (body.trim() === '') throw fail('url document is empty')
         return storeBody(notebookId, { kind: 'url', title, body, locator: parsed.href })
       } catch (error) {
@@ -598,14 +634,107 @@ export function openLibrary(file, limits, deps = {}) {
       }
       return rankChunks(chunks, query, topK)
     },
-    overview(notebookId, limit = limits.topK) {
+    /** Cover named query topics and sources, expanding each hit into readable surrounding evidence. */
+    researchPassages(notebookId, query, limit = limits.topK, sourceIds) {
+      requireNotebook(notebookId)
+      const count = Number(limit)
+      if (!Number.isSafeInteger(count) || count < 0) throw fail('research passage limit must be a non-negative integer')
+      if (count === 0) return []
+      const sources = sourceStmt.byNotebook.all(notebookId)
+        .map(refreshFile)
+        .filter(row => row.enabled === 1 && row.status === 'ready' && (!sourceIds || sourceIds.has(row.id)))
+        .map(row => ({ row, chunks: chunkStmt.forSource.all(row.id) }))
+      // Long requests repeat broad language/module names in their formatting
+      // instructions. Repetition must not outweigh explicitly requested APIs.
+      const words = new Set()
+      const facets = []
+      const facetByTerm = new Map()
+      const uniqueQuery = query.replace(/[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*/g, term => {
+        const key = term.toLowerCase()
+        if (words.has(key)) { const facet = facetByTerm.get(key); if (facet) facet.mentions += 1; return ' ' }
+        words.add(key)
+        const pattern = new RegExp('(^|[^A-Za-z0-9_])' + term.replaceAll('.', '\\s*\\.\\s*') + '(?=$|[^A-Za-z0-9_])', 'i')
+        const frequencies = sources.map(source => source.chunks.filter(chunk => pattern.test(chunk.text)).length)
+        const sourceCount = frequencies.filter(Boolean).length
+        if (sourceCount) {
+          const facet = { term, pattern, sourceCount, chunkCount: frequencies.reduce((sum, value) => sum + value, 0), mentions: 1, identifier: /[a-z][A-Z]|_|\./.test(term) }
+          facets.push(facet); facetByTerm.set(key, facet)
+        }
+        return term
+      })
+      // Specific terms in one source precede broad words found throughout the
+      // notebook. Within that group, preserve named API/identifier coverage.
+      facets.sort((a, b) => Number(a.mentions > 1 && !a.identifier) - Number(b.mentions > 1 && !b.identifier) ||
+        a.sourceCount - b.sourceCount || Number(b.identifier) - Number(a.identifier) || a.chunkCount - b.chunkCount)
+      const queues = sources.map(({ row, chunks }) => {
+          const matches = rankChunks(chunks, uniqueQuery, chunks.length)
+          // A source without query matches still contributes substantive context,
+          // explicitly marked as fallback rather than a claimed keyword hit.
+          const ranked = matches.length ? matches : [...chunks].sort((a, b) => b.text.length - a.text.length || a.ordinal - b.ordinal)
+          const positions = new Map(chunks.map((chunk, index) => [chunk.ordinal, index]))
+          const used = new Set()
+          const windows = []
+          function appendWindow(chunk, matched) {
+            if (used.has(chunk.ordinal) || windows.length >= count) return
+            const parts = [chunk]
+            used.add(chunk.ordinal)
+            let chars = chunk.text.length
+            // Paragraph-sized chunks can contain only a heading or half an API
+            // explanation. Keep neighboring paragraphs until a useful window is
+            // assembled; the caller still owns the total prompt character budget.
+            for (let index = positions.get(chunk.ordinal) + 1; index < chunks.length && chars < Math.ceil(limits.chunkChars * 1.5); index += 1) {
+              const next = chunks[index]
+              if (used.has(next.ordinal)) break
+              parts.push(next); used.add(next.ordinal); chars += next.text.length + 2
+            }
+            windows.push({ sourceId: row.id, title: row.title, ordinal: chunk.ordinal,
+              text: parts.map(part => part.text).join('\n\n'), locator: chunk.locator,
+              ordinals: parts.map(part => part.ordinal), matched })
+          }
+          // One evidence window for each named topic comes before generic BM25
+          // hits. Exact token matching avoids treating TerminateTaskGroup as the
+          // requested TaskGroup API merely because it contains the same letters.
+          for (const facet of facets) {
+            const candidates = chunks.filter(chunk => facet.pattern.test(chunk.text))
+            const definition = chunk => {
+              const heading = chunk.text.split('\n', 1)[0].trim().replace(/^[-*]\s*/, '')
+              const declaration = heading.match(/^(?:(class|(?:async\s+)?def)\s+)?([A-Za-z][A-Za-z0-9_.]*)\s*(\(|¶|$)/)
+              if (!declaration || (!declaration[1] && declaration[3] !== '(')) return 0
+              const name = facet.term.includes('.') ? declaration[2] : declaration[2].split('.').at(-1)
+              return name === facet.term ? 2 : name.toLowerCase() === facet.term.toLowerCase() ? 1 : 0
+            }
+            const next = rankChunks(candidates, facet.term, candidates.length)
+              .sort((a, b) => definition(b) - definition(a))
+              .find(chunk => !used.has(chunk.ordinal))
+            if (next) appendWindow(next, true)
+          }
+          for (const chunk of ranked) {
+            appendWindow(chunk, matches.length > 0)
+            if (windows.length >= count) break
+          }
+          return windows
+        })
+      const passages = []
+      for (let index = 0; passages.length < count; index += 1) {
+        let found = false
+        for (const queue of queues) {
+          if (!queue[index]) continue
+          found = true
+          passages.push(queue[index])
+          if (passages.length === count) break
+        }
+        if (!found) break
+      }
+      return passages
+    },
+    overview(notebookId, limit = limits.topK, sourceIds) {
       requireNotebook(notebookId)
       const count = Number(limit)
       if (!Number.isSafeInteger(count) || count < 0) throw fail('overview limit must be a non-negative integer')
       if (count === 0) return []
       const sources = sourceStmt.byNotebook.all(notebookId)
         .map(refreshFile)
-        .filter(row => row.enabled === 1 && row.status === 'ready')
+        .filter(row => row.enabled === 1 && row.status === 'ready' && (!sourceIds || sourceIds.has(row.id)))
         .map(row => ({ row, chunks: chunkStmt.forSource.all(row.id) }))
       const passages = []
       for (let ordinal = 0; passages.length < count; ordinal += 1) {

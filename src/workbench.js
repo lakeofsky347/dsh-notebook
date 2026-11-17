@@ -74,14 +74,23 @@ export function createWorkbench(ctx, library, options) {
     if (event.type === 'user/message' || event.type === 'assistant/message') {
       const message = event.type === 'user/message' ? data : data.message
       const role = event.type === 'user/message' ? 'user' : 'assistant'
+      // Native context providers also append user/message events. They belong
+      // to model history, but are not messages authored by the person in this
+      // workbench (time context, system reminders, and other injected input).
+      if (role === 'user' && message.source?.kind !== 'user') {
+        if (Number.isSafeInteger(event.seq)) record.events.add(event.seq)
+        return
+      }
       let id = record.messages.get(message.id)
       // A stream row already exists before its final native event. On resume,
       // turn/step correlates that row with the committed message as well.
       if (!id && role === 'assistant') {
         id = [...record.rows.values()].find(row => row.role === 'assistant' && row.status === 'streaming' && row.metadata?.turn === data.turn && row.metadata?.step === data.step)?.id
       }
-      const meta = metadata(record, event, { nativeMessageId: message.id, ...(data.turn === undefined ? {} : { turn: data.turn, step: data.step }), ...(data.interrupted ? { interrupted: true } : {}) })
-      const body = { text: textOf(message.content), content: message.content, status: data.interrupted ? 'cancelled' : 'done', metadata: meta }
+      const previous = id && record.rows.get(id)
+      const displayText = role === 'user' ? previous?.metadata?.displayText : undefined
+      const meta = metadata(record, event, { ...previous?.metadata, nativeMessageId: message.id, ...(data.turn === undefined ? {} : { turn: data.turn, step: data.step }), ...(data.interrupted ? { interrupted: true } : {}) })
+      const body = { text: displayText ?? textOf(message.content), content: displayText === undefined ? message.content : [{ type: 'text', text: displayText }], status: data.interrupted ? 'cancelled' : 'done', metadata: meta }
       const row = id ? update(record, id, body) : append(record, { ...body, role, provider: message.source?.provider ?? route.provider, model: message.source?.model ?? route.model })
       if (role === 'assistant' && record.stream?.rowId === row.id) {
         clearTimeout(record.stream.timer)
@@ -237,9 +246,10 @@ export function createWorkbench(ctx, library, options) {
       if (typeof agent.model?.select === 'function') agent.model.select(task.route)
       task.turnReason = null
       const message = makeUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
+      const displayText = task.displayText ?? text
       const row = append(record, {
-        role: 'user', text, content: message.content, provider: task.route.provider, model: task.route.model, status: 'pending',
-        metadata: { nativeSessionId: agent.id, nativeMessageId: message.id },
+        role: 'user', text: displayText, content: [{ type: 'text', text: displayText }], provider: task.route.provider, model: task.route.model, status: 'pending',
+        metadata: { nativeSessionId: agent.id, nativeMessageId: message.id, ...(task.displayText === undefined ? {} : { displayText }) },
       })
       task.userRowId = row.id
       task.phase = 'thinking'
@@ -253,7 +263,11 @@ export function createWorkbench(ctx, library, options) {
       } else if (reason?.kind === 'aborted' || reason?.kind === 'interrupted') task.status = 'cancelled'
       else if (task.error || reason?.kind === 'error' || reason?.kind === 'max-tokens' || reason?.kind === 'blocked') {
         throw new Error(task.error || reason.error?.message || (reason.kind === 'max-tokens' ? '模型输出达到上限，请继续或缩小任务范围。' : '模型任务被阻止。'))
-      } else task.status = 'done'
+      } else {
+        await options.finalize?.(record.workspaceId, task.controller.signal)
+        task.controller.signal.throwIfAborted()
+        task.status = 'done'
+      }
     } catch (error) {
       task.status = ['user', 'disposed'].includes(task.stopCause) ? 'cancelled' : 'failed'
       if (task.status === 'failed') task.error = task.error || messageOf(error)
@@ -273,6 +287,8 @@ export function createWorkbench(ctx, library, options) {
       }
       task.phase = task.status
       task.finishedAt = Date.now()
+      try { options.onFinish?.(record.workspaceId, snapshot(task)) }
+      catch (error) { task.status = 'failed'; task.phase = 'failed'; task.error = messageOf(error) }
     }
   }
 
@@ -306,7 +322,7 @@ export function createWorkbench(ctx, library, options) {
       try { return await promise }
       finally { reservations.delete(workspaceId); preparations.delete(workspaceId) }
     },
-    async start(workspaceId, input, selectedRoute, selectedMode) {
+    async start(workspaceId, input, selectedRoute, selectedMode, presentation = {}) {
       if (disposed) throw new Error('工作台已关闭')
       const workspace = library.getWorkspace(workspaceId)
       if (!workspace) throw new Error('workspace not found')
@@ -323,7 +339,7 @@ export function createWorkbench(ctx, library, options) {
         if (!route?.provider || !route?.model) throw new Error('请选择可用的模型')
         library.updateWorkspace(workspaceId, { provider: route.provider, model: route.model, mode })
       } finally { reservations.delete(workspaceId) }
-      const task = { id: randomUUID(), workspaceId, status: 'running', phase: 'preparing', error: '', steps: 0, startedAt: Date.now(), finishedAt: null, mode, route: { ...route }, controller: new AbortController() }
+      const task = { id: randomUUID(), workspaceId, status: 'running', phase: 'preparing', error: '', steps: 0, startedAt: Date.now(), finishedAt: null, mode, route: { ...route }, controller: new AbortController(), displayText: presentation.displayText }
       tasks.set(workspaceId, task)
       let record = owned.get(workspaceId)
       if (!record) {
@@ -336,6 +352,7 @@ export function createWorkbench(ctx, library, options) {
       return snapshot(task)
     },
     cancel(workspaceId) {
+      preparations.get(workspaceId)?.controller.abort(new Error('已停止'))
       const record = owned.get(workspaceId)
       if (record) stop(record, 'user')
       return snapshot(tasks.get(workspaceId))
