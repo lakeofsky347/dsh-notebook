@@ -399,9 +399,9 @@ try {
   check('系统动态偏好恢复后继续播放真实鲸尾帧', new Set(restoredFrames).size > 1)
   const darkPalette = await evaluate(motion, `(() => { const panel = getComputedStyle(document.querySelector('.dsh-nb')); return { background: panel.backgroundColor, foreground: panel.color, accent: getComputedStyle(document.querySelector('.dsh-nb-activity')).color } })()`)
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'prefers-color-scheme', value: 'light' }] }, motion)
-  // Theme transitions finish before reading enabled controls or taking the
-  // acceptance screenshot; a captured intermediate white label is misleading.
-  await waitFor(motion, `document.querySelector('.dsh-nb').getAnimations({ subtree: true }).every(animation => animation.playState !== 'running')`)
+  // Sample the settled theme colors while the ambient keyframe animations continue.
+  await waitFor(motion, `document.querySelector('.dsh-nb').getAnimations({ subtree: true })
+    .every(animation => !(animation instanceof CSSTransition) || animation.playState !== 'running')`)
   const lightPalette = await evaluate(motion, `(() => { const panel = getComputedStyle(document.querySelector('.dsh-nb')); return { background: panel.backgroundColor, foreground: panel.color, accent: getComputedStyle(document.querySelector('.dsh-nb-activity')).color } })()`)
   report.themes = { dark: darkPalette, light: lightPalette }
   check('浅色和深色主题分别适配背景文字与鲸尾颜色', darkPalette.background !== lightPalette.background && darkPalette.foreground !== lightPalette.foreground && darkPalette.foreground !== darkPalette.background && lightPalette.foreground !== lightPalette.background && lightPalette.accent !== lightPalette.background && darkPalette.accent !== darkPalette.background)
