@@ -399,9 +399,9 @@ try {
   check('系统动态偏好恢复后继续播放真实鲸尾帧', new Set(restoredFrames).size > 1)
   const darkPalette = await evaluate(motion, `(() => { const panel = getComputedStyle(document.querySelector('.dsh-nb')); return { background: panel.backgroundColor, foreground: panel.color, accent: getComputedStyle(document.querySelector('.dsh-nb-activity')).color } })()`)
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'prefers-color-scheme', value: 'light' }] }, motion)
-  // Sample the settled theme colors while the ambient keyframe animations continue.
-  await waitFor(motion, `document.querySelector('.dsh-nb').getAnimations({ subtree: true })
-    .every(animation => !(animation instanceof CSSTransition) || animation.playState !== 'running')`)
+  // Theme transitions finish before reading enabled controls or taking the
+  // acceptance screenshot; a captured intermediate white label is misleading.
+  await waitFor(motion, `document.querySelector('.dsh-nb').getAnimations({ subtree: true }).every(animation => animation.playState !== 'running' || animation.effect?.getTiming?.().iterations === Infinity)`)
   const lightPalette = await evaluate(motion, `(() => { const panel = getComputedStyle(document.querySelector('.dsh-nb')); return { background: panel.backgroundColor, foreground: panel.color, accent: getComputedStyle(document.querySelector('.dsh-nb-activity')).color } })()`)
   report.themes = { dark: darkPalette, light: lightPalette }
   check('浅色和深色主题分别适配背景文字与鲸尾颜色', darkPalette.background !== lightPalette.background && darkPalette.foreground !== lightPalette.foreground && darkPalette.foreground !== darkPalette.background && lightPalette.foreground !== lightPalette.background && lightPalette.accent !== lightPalette.background && darkPalette.accent !== darkPalette.background)
@@ -453,7 +453,7 @@ try {
 
   const layout = await open('ready', 1100, 800)
   check('常态顶栏只有一行且模型选择位于输入框', await evaluate(layout, `document.querySelector('.dsh-nb-toolbar').getBoundingClientRect().height <= 64 && !!document.querySelector('.dsh-nb-composer .dsh-nb-model-select') && !document.querySelector('.dsh-nb-toolbar select')`))
-  check('Studio 侧栏突出学习指南，六项工具分成三列', await evaluate(layout, `document.querySelectorAll('.dsh-nb-card:not(.dsh-nb-guide-card)').length === 6 && document.querySelector('.dsh-nb-guide-card')?.dataset.studioKind === 'study-guide' && getComputedStyle(document.querySelector('.dsh-nb-studio-grid')).gridTemplateColumns.split(' ').length === 3`))
+  check('Studio 侧栏突出学习指南，六项工具分成两列横向胶囊', await evaluate(layout, `document.querySelectorAll('.dsh-nb-card:not(.dsh-nb-guide-card)').length === 6 && document.querySelector('.dsh-nb-guide-card')?.dataset.studioKind === 'study-guide' && getComputedStyle(document.querySelector('.dsh-nb-studio-grid')).gridTemplateColumns.split(' ').length === 2`))
   await selectModel(layout, '对话模型', 'dev-secondary', 'fixture-other')
   check('分组模型菜单同时更新提供方和模型', await evaluate(layout, `window.__nbDev.store.workspaces[0].provider === 'dev-secondary' && window.__nbDev.store.workspaces[0].model === 'fixture-other'`))
   await click(layout, '[data-action="notebooks"]')
@@ -483,11 +483,11 @@ try {
   check('仅真实来源成为引用且模型文字不执行 HTML', await evaluate(layout, `document.querySelectorAll('.dsh-nb-citation').length === 1 && document.querySelector('.dsh-nb-message-body').textContent.includes('[outside-source]') && !window.__unsafe`))
   await evaluate(layout, `document.querySelector('[data-citation-source="s1"]').focus()`)
   await click(layout, '[data-citation-source="s1"]')
-  await waitFor(layout, `document.querySelector('.dsh-nb-source-body')`)
+  await waitFor(layout, `document.querySelector('[data-detail-surface="source"] .dsh-nb-source-body') && !document.querySelector('.dsh-nb-dialog')`)
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, layout)
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, layout)
-  await waitFor(layout, `!document.querySelector('.dsh-nb-dialog')`)
-  check('详情支持 Esc 关闭且焦点回到引用', await evaluate(layout, `document.activeElement?.dataset.citationSource === 's1'`))
+  await waitFor(layout, `!document.querySelector('[data-detail-surface="source"], .dsh-nb-dialog')`)
+  check('详情支持栏内展开、Esc 关闭且焦点回到引用', await evaluate(layout, `document.activeElement?.dataset.citationSource === 's1'`))
   await click(layout, '[data-action="save-answer"]')
   await waitFor(layout, `window.__nbDev.store.sources.nb1.length === 6`)
   check('保存回答绑定当前笔记本', await evaluate(layout, `window.__nbDev.store.sources.nb1.at(-1).kind === 'note' && window.__nbDev.store.sources.nb1.at(-1).body.includes('[s1]') && window.__nbDev.store.sources.nb2.length === 0`))
@@ -554,7 +554,7 @@ try {
 
   const practice = await open('study')
   await openPractice(practice, 'aq1')
-  check('测验先显示题目和选项，提交前不泄露答案或解释', await evaluate(practice, `document.querySelector('[data-study-item="q1"]') && document.querySelectorAll('[data-study-choice]').length === 2 && !document.querySelector('[data-study-feedback]') && !document.querySelector('.dsh-nb-dialog').textContent.includes('来源引用应保留原文与定位')`))
+  check('测验先显示题目和选项，提交前不泄露答案或解释', await evaluate(practice, `document.querySelector('[data-study-item="q1"]') && document.querySelectorAll('[data-study-choice]').length === 2 && !document.querySelector('[data-study-feedback]') && !document.querySelector('[data-detail-surface="artifact"]').textContent.includes('来源引用应保留原文与定位')`))
   await click(practice, '[data-study-choice="B"]')
   await doubleClick(practice, '[data-action="study-submit"]')
   await waitFor(practice, `document.querySelector('[data-study-feedback]')?.textContent.includes('来源引用应保留原文与定位')`)
@@ -562,7 +562,7 @@ try {
   await shot(practice, 'quiz-feedback')
   await click(practice, '[data-study-feedback] [data-citation-source="s1"]')
   await waitFor(practice, `document.querySelector('.dsh-nb-source-body')?.textContent.includes('来源引用')`)
-  check('练习解释引用可核验当前笔记本保存的来源正文')
+  check('练习解释引用可在左栏并列核验保存正文且不遮挡测验', await evaluate(practice, `!!document.querySelector('[data-detail-surface="source"]') && !!document.querySelector('[data-detail-surface="artifact"]') && !document.querySelector('.dsh-nb-dialog')`))
   await click(practice, '[aria-label="关闭详情"]')
   await enterPractice(practice)
   check('查看引用后重开测验仍保留已提交反馈', await evaluate(practice, `document.querySelector('[data-study-item="q1"]') && document.querySelector('[data-study-feedback]')`))
@@ -591,7 +591,7 @@ try {
   await click(practice, '[aria-label="关闭详情"]')
 
   await openPractice(practice, 'af1')
-  check('闪卡先回忆，翻面前没有答案或自评按钮', await evaluate(practice, `document.querySelector('[data-study-item="f1"]') && document.querySelector('[aria-label="先写下你的回忆"]') && !document.querySelector('[data-study-feedback]') && !document.querySelector('[data-study-rating]') && !document.querySelector('.dsh-nb-dialog').textContent.includes('便于研究者核验模型给出的结论')`))
+  check('闪卡先回忆，翻面前没有答案或自评按钮', await evaluate(practice, `document.querySelector('[data-study-item="f1"]') && document.querySelector('[aria-label="先写下你的回忆"]') && !document.querySelector('[data-study-feedback]') && !document.querySelector('[data-study-rating]') && !document.querySelector('[data-detail-surface="artifact"]').textContent.includes('便于研究者核验模型给出的结论')`))
   await input(practice, '[aria-label="先写下你的回忆"]', '我记得需要核对证据，但还不确定如何定位。')
   await evaluate(practice, `window.__answersBeforeReveal = window.__nbDev.requests.filter(item => item.op === 'studyAnswer').length`)
   await doubleClick(practice, '[data-action="study-reveal"]')
@@ -599,7 +599,7 @@ try {
   check('闪卡保存回忆再显示答案，双击翻面不会重复写入', await evaluate(practice, `(() => { const session = Object.values(window.__nbDev.store.studySessions).find(item => item.artifactId === 'af1'); return session.history.length === 1 && session.history[0].answer.includes('还不确定') && session.history[0].correct === null && window.__nbDev.requests.filter(item => item.op === 'studyAnswer').length === window.__answersBeforeReveal + 1 && document.querySelector('[data-study-rating="again"]') && (!document.querySelector('[data-action="study-next"]') || document.querySelector('[data-action="study-next"]').disabled) })()`))
   await doubleClick(practice, '[data-study-rating="again"]')
   await waitFor(practice, `document.querySelector('[data-action="study-next"]') && !document.querySelector('[data-action="study-next"]').disabled`)
-  check('闪卡自评再练只记录一次，区分自评与自动评分', await evaluate(practice, `(() => { const session = Object.values(window.__nbDev.store.studySessions).find(item => item.artifactId === 'af1'); return session.history[0].rating === 'again' && session.history[0].grading === 'self-assessment' && session.history[0].correct === false && window.__nbDev.requests.filter(item => item.op === 'studyRate').length === 1 && document.querySelector('.dsh-nb-dialog').textContent.includes('自评') })()`))
+  check('闪卡自评再练只记录一次，区分自评与自动评分', await evaluate(practice, `(() => { const session = Object.values(window.__nbDev.store.studySessions).find(item => item.artifactId === 'af1'); return session.history[0].rating === 'again' && session.history[0].grading === 'self-assessment' && session.history[0].correct === false && window.__nbDev.requests.filter(item => item.op === 'studyRate').length === 1 && document.querySelector('[data-detail-surface="artifact"]').textContent.includes('自评') })()`))
   await click(practice, '[data-action="study-next"]')
   await waitFor(practice, `document.querySelector('[data-study-item="f2"]')`)
   await input(practice, '[aria-label="先写下你的回忆"]', '取消后保留已收到的内容。')
@@ -632,7 +632,7 @@ try {
   await waitFor(practice, `document.querySelector('[data-artifact-id="abroken"]')`)
   for (const [artifactId, error] of [['abroken', '不是有效 JSON'], ['aunknown', '未知来源']]) {
     await click(practice, '[data-artifact-id="' + artifactId + '"]')
-    await waitFor(practice, `document.querySelector('.dsh-nb-dialog')?.textContent.includes(${JSON.stringify(error)})`)
+    await waitFor(practice, `document.querySelector('[data-detail-surface="artifact"]')?.textContent.includes(${JSON.stringify(error)})`)
     check((artifactId === 'abroken' ? '旧格式无效 JSON' : '未知来源引用') + '练习明确拒绝且不执行内容或生成可点击外部引用', await evaluate(practice, `document.querySelector('[data-action="study-regenerate"]') && !document.querySelector('[data-action="study-start"], [data-study-choice], [data-study-rating], [data-citation-source="outside-source"]') && !window.__studyUnsafe && !Object.values(window.__nbDev.store.studySessions).some(item => item.artifactId === ${JSON.stringify(artifactId)})`))
     await click(practice, '[aria-label="关闭详情"]')
   }

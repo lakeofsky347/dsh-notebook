@@ -43,10 +43,15 @@ window.__ModuleLoader__.load({
       return percent(index, 49) + ' { mask-position: ' + percent(index % 7, 6) + ' ' + percent(Math.floor(index / 7), 6) + '; }'
     }).join('\n')
     const PANEL_CSS = `
+@property --nb-aura-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
 .dsh-nb {
-  --nb-fallback-bg: #0c0e14; --nb-fallback-panel: #151821; --nb-fallback-soft: #1f2430;
-  --nb-fallback-fg: #eaf0f8; --nb-fallback-muted: #94a1b8; --nb-fallback-line: #272d3a;
-  --nb-fallback-accent: #7aa6ff; --nb-fallback-danger: #ffb8b8;
+  --nb-fallback-bg: #111318; --nb-fallback-panel: #1a1d24; --nb-fallback-soft: #242832;
+  --nb-fallback-fg: #eef2f8; --nb-fallback-muted: #94a0b4; --nb-fallback-line: #2a2f3b;
+  --nb-fallback-accent: #739eff; --nb-fallback-danger: #ff9ea5;
   --nb-bg: var(--dsw-alias-bg-base, var(--nb-fallback-bg));
   --nb-panel: var(--dsw-alias-bg-layer-1, var(--nb-fallback-panel));
   --nb-soft: var(--dsw-alias-bg-layer-2, var(--nb-fallback-soft));
@@ -54,62 +59,140 @@ window.__ModuleLoader__.load({
   --nb-muted: var(--dsw-alias-label-secondary, var(--nb-fallback-muted));
   --nb-line: var(--dsw-alias-border-l2, var(--nb-fallback-line));
   --nb-accent: var(--dsw-alias-link, var(--nb-fallback-accent));
-  --nb-accent-soft: color-mix(in srgb, var(--nb-accent) 12%, transparent);
+  --nb-accent-ink: color-mix(in srgb, var(--nb-accent) 78%, var(--nb-fg));
+  --nb-accent-soft: color-mix(in srgb, var(--nb-accent) 13%, transparent);
+  --nb-aurora-sky: color-mix(in srgb, var(--nb-accent) 56%, #52c7f7);
+  --nb-aurora-indigo: color-mix(in srgb, var(--nb-accent) 52%, #8474f5);
   --nb-danger: var(--dsw-alias-state-error-primary, var(--nb-fallback-danger));
-  --nb-ease: var(--ds-ease-in-out, cubic-bezier(.22,1,.36,1));
-  --nb-spring: cubic-bezier(.2,.92,.24,1.18);
-  --nb-left: clamp(232px, 22cqi, 268px); --nb-right: clamp(264px, 24cqi, 296px);
+  --nb-canvas: var(--nb-bg);
+  --nb-island: var(--nb-panel);
+  --nb-tile: color-mix(in srgb, var(--nb-soft) 72%, var(--nb-panel));
+  --nb-tile-hover: color-mix(in srgb, var(--nb-soft) 92%, var(--nb-accent) 10%);
+  --nb-hairline: color-mix(in srgb, var(--nb-line) 86%, transparent);
+  --nb-composer-bg: color-mix(in srgb, var(--dsw-specific-input-major, var(--nb-soft)) 84%, var(--nb-island));
+  --nb-island-shadow: 0 2px 12px -4px rgba(0, 0, 0, .28);
+  --nb-ease: var(--ds-ease-in-out, cubic-bezier(.22, 1, .36, 1));
+  --nb-ease-spatial: cubic-bezier(.16, 1, .3, 1);
+  --nb-ease-exit: cubic-bezier(.3, 0, .8, .15);
+  --nb-spring: cubic-bezier(.2, .95, .24, 1.22);
+  --nb-left: clamp(232px, 19.8cqi, 256px);
+  --nb-right: clamp(242px, 20.4cqi, 260px);
   height: 100%; min-height: 0; min-width: 0; display: flex; flex-direction: column;
-  background-color: var(--nb-bg); color: var(--nb-fg); color-scheme: inherit;
+  background-color: var(--nb-bg); background-image: none; color: var(--nb-fg); color-scheme: dark;
   font: 14px/1.55 var(--dsw-font-family, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif);
   container: notebook / inline-size; -webkit-font-smoothing: antialiased;
 }
+@supports (transition-timing-function: linear(0, 1)) {
+  .dsh-nb { --nb-spring: linear(0, .38 10%, .82 24%, 1.038 44%, 1.012 68%, 1); }
+}
+@media (prefers-color-scheme: light) {
+  .dsh-nb {
+    color-scheme: light;
+    --nb-fallback-bg: #f3f6fb; --nb-fallback-panel: #ffffff; --nb-fallback-soft: #e9eef6;
+    --nb-fallback-fg: #141923; --nb-fallback-muted: #566175; --nb-fallback-line: #dce3ee;
+    --nb-fallback-accent: #3664d4; --nb-fallback-danger: #c03945;
+    --nb-accent-ink: color-mix(in srgb, var(--nb-accent) 82%, #0f172a);
+    --nb-canvas: color-mix(in srgb, var(--nb-soft) 82%, var(--nb-accent) 4%);
+    --nb-island: var(--dsw-alias-bg-base, var(--nb-fallback-panel));
+    --nb-tile: color-mix(in srgb, var(--nb-soft) 52%, var(--nb-island));
+    --nb-tile-hover: color-mix(in srgb, var(--nb-soft) 84%, var(--nb-accent) 8%);
+    --nb-hairline: color-mix(in srgb, var(--nb-line) 78%, transparent);
+    --nb-composer-bg: color-mix(in srgb, var(--nb-soft) 36%, var(--nb-island));
+    --nb-island-shadow: 0 1px 3px rgba(15, 23, 42, .04), 0 8px 24px -18px rgba(15, 23, 42, .08);
+  }
+}
+:root[data-theme=light] .dsh-nb, .light .dsh-nb {
+  color-scheme: light;
+  --nb-accent-ink: color-mix(in srgb, var(--nb-accent) 82%, #0f172a);
+  --nb-canvas: color-mix(in srgb, var(--nb-soft) 82%, var(--nb-accent) 4%);
+  --nb-island: var(--dsw-alias-bg-base, #ffffff);
+  --nb-tile: color-mix(in srgb, var(--nb-soft) 52%, var(--nb-island));
+  --nb-tile-hover: color-mix(in srgb, var(--nb-soft) 84%, var(--nb-accent) 8%);
+  --nb-hairline: color-mix(in srgb, var(--nb-line) 78%, transparent);
+  --nb-composer-bg: color-mix(in srgb, var(--nb-soft) 36%, var(--nb-island));
+  --nb-island-shadow: 0 1px 3px rgba(15, 23, 42, .04), 0 8px 24px -18px rgba(15, 23, 42, .08);
+}
 .dsh-nb *, .dsh-nb *::before, .dsh-nb *::after { box-sizing: border-box; }
-.dsh-nb p, .dsh-nb h2, .dsh-nb h3 { margin: 0; }
+.dsh-nb p, .dsh-nb h2, .dsh-nb h3, .dsh-nb h4 { margin: 0; }
 .dsh-nb button, .dsh-nb input, .dsh-nb textarea, .dsh-nb select { font: inherit; color: inherit; }
 .dsh-nb button { padding: 0; border: 0; background: transparent; cursor: pointer; }
 .dsh-nb button:disabled { cursor: not-allowed; opacity: .45; }
 .dsh-nb :focus-visible { outline: 2px solid color-mix(in srgb, var(--nb-accent) 85%, white); outline-offset: 2px; }
-.dsh-nb ::selection { background: color-mix(in srgb, var(--nb-accent) 24%, transparent); color: var(--nb-fg); }
+.dsh-nb ::selection { background: color-mix(in srgb, var(--nb-accent) 22%, transparent); color: var(--nb-fg); }
 .dsh-nb svg { flex: none; }
 .dsh-nb [hidden] { display: none !important; }
+.dsh-nb-stage { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; background-color: var(--nb-canvas); }
 .dsh-nb-meta { font-size: 12px; line-height: 1.55; color: var(--nb-muted); overflow-wrap: anywhere; }
-.dsh-nb-empty { padding: 16px 8px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.dsh-nb-empty { padding: 18px 10px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+
+/* Buttons & Quiet Pills */
 .dsh-nb button.dsh-nb-chip {
-  border: 1px solid color-mix(in srgb, var(--nb-line) 72%, transparent);
-  border-radius: 999px; padding: 6px 13px; font-size: 12px; font-weight: 450;
+  border: 1px solid var(--nb-hairline);
+  border-radius: 999px; padding: 6px 13px; font-size: 12px; font-weight: 480;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  background: color-mix(in srgb, var(--nb-panel) 55%, transparent);
+  background: var(--nb-tile); color: var(--nb-fg);
 }
 .dsh-nb button.dsh-nb-chip:hover:not(:disabled),
 .dsh-nb .dsh-nb-quiet:hover:not(:disabled),
 .dsh-nb .dsh-nb-icon-button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--nb-soft) 75%, var(--nb-accent-soft));
+  background: var(--nb-tile-hover);
 }
 .dsh-nb button.dsh-nb-chip:active:not(:disabled),
 .dsh-nb .dsh-nb-quiet:active:not(:disabled),
-.dsh-nb .dsh-nb-icon-button:active:not(:disabled) { transform: scale(.965); }
-.dsh-nb button.dsh-nb-chip.primary { background: var(--nb-accent-soft); color: var(--nb-accent); border-color: transparent; }
-.dsh-nb button.danger { color: var(--nb-danger); border-color: color-mix(in srgb, var(--nb-danger) 35%, transparent); }
+.dsh-nb .dsh-nb-icon-button:active:not(:disabled) { transform: scale(.955); }
+.dsh-nb button.dsh-nb-chip.primary {
+  background: color-mix(in srgb, var(--nb-accent) 13%, var(--nb-island));
+  color: var(--nb-accent-ink);
+  border-color: color-mix(in srgb, var(--nb-accent) 26%, transparent);
+}
+.dsh-nb button.dsh-nb-chip.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--nb-accent) 20%, var(--nb-island));
+  border-color: color-mix(in srgb, var(--nb-accent) 42%, transparent);
+}
+.dsh-nb button.danger { color: var(--nb-danger); border-color: color-mix(in srgb, var(--nb-danger) 36%, transparent); }
 .dsh-nb .dsh-nb-quiet { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 6px 10px; border-radius: 999px; font-size: 12px; white-space: nowrap; color: var(--nb-muted); }
 .dsh-nb .dsh-nb-quiet:hover:not(:disabled) { color: var(--nb-fg); }
 .dsh-nb .dsh-nb-icon-button { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 999px; color: var(--nb-muted); }
 .dsh-nb .dsh-nb-icon-button:hover:not(:disabled) { color: var(--nb-fg); }
-.dsh-nb-toolbar { flex: none; min-height: 54px; display: flex; align-items: center; gap: 10px; padding: 10px 16px; }
-.dsh-nb-toolbar-brand { color: var(--nb-accent); display: flex; transition: transform 280ms var(--nb-spring); }
-.dsh-nb-toolbar-brand:hover { transform: scale(1.06) rotate(-3deg); }
-.dsh-nb .dsh-nb-notebook-trigger {
-  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 55%;
-  padding: 5px 11px 5px 12px; border-radius: 999px; border: 1px solid transparent;
-  font-size: 15px; font-weight: 500; letter-spacing: -.01em; text-align: left;
+
+/* Seamless Recessed Toolbar */
+.dsh-nb-toolbar {
+  flex: none; min-height: 52px; display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px 4px; background-color: var(--nb-canvas);
 }
-.dsh-nb .dsh-nb-notebook-trigger:hover { background: color-mix(in srgb, var(--nb-soft) 65%, transparent); border-color: var(--nb-glass-edge, var(--nb-line)); }
+.dsh-nb-toolbar-brand {
+  color: var(--nb-accent); display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--nb-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--nb-accent) 11%, var(--nb-island));
+  transition: transform 340ms var(--nb-spring);
+}
+.dsh-nb-toolbar-brand svg { width: 17px; height: 17px; }
+.dsh-nb-toolbar-brand:hover { transform: scale(1.08) rotate(-4deg); }
+.dsh-nb .dsh-nb-notebook-trigger {
+  display: flex; align-items: center; gap: 7px; min-width: 0; max-width: 55%;
+  padding: 5px 10px 5px 11px; border-radius: 10px; border: 1px solid transparent;
+  font-size: 15px; font-weight: 560; letter-spacing: -.015em; text-align: left;
+}
+.dsh-nb .dsh-nb-notebook-trigger:hover { background: var(--nb-island); border-color: var(--nb-hairline); }
 .dsh-nb-notebook-trigger span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dsh-nb-notebook-trigger svg { color: var(--nb-muted); transition: transform 220ms var(--nb-ease); }
-.dsh-nb-notebook-trigger:hover svg { transform: translateY(1px); color: var(--nb-accent); }
+.dsh-nb-notebook-trigger svg { color: var(--nb-muted); transition: transform 260ms var(--nb-ease-spatial); }
+.dsh-nb-notebook-trigger:hover svg { transform: translateY(1.5px); color: var(--nb-accent); }
 .dsh-nb-toolbar-controls { display: flex; gap: 4px; align-items: center; margin-left: auto; flex: none; }
+
+/* Native DSH Whale Activity Slot & Empty-State Particle Whale */
 .dsh-nb-activity-slot { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.dsh-nb-activity { height: 28px; min-width: 28px; display: inline-flex; align-items: center; justify-content: center; pointer-events: none; color: var(--dsw-alias-label-deep-diving, var(--nb-accent)); animation: dsh-nb-enter 180ms var(--nb-ease) both; }
+.dsh-nb-activity {
+  position: relative; isolation: isolate; height: 28px; min-width: 28px;
+  display: inline-flex; align-items: center; justify-content: center; pointer-events: none;
+  color: var(--dsw-alias-label-deep-diving, var(--nb-accent));
+  animation: dsh-nb-enter 180ms var(--nb-ease-spatial) both;
+}
+.dsh-nb-activity::before {
+  content: ''; position: absolute; inset: 1px; z-index: -1; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, currentColor 18%, transparent), transparent 72%);
+}
+@media (forced-colors: active) { .dsh-nb-activity::before { display: none; } }
 .dsh-nb-whale { position: relative; display: inline-flex; flex: none; width: 20px; height: 20px; contain: strict; overflow: hidden; }
 .dsh-nb-whale-animated { display: none; position: absolute; inset: 0; }
 .dsh-nb-whale-still { display: block; }
@@ -122,18 +205,18 @@ window.__ModuleLoader__.load({
 }
 .dsh-nb .dsh-nb-particle-whale {
   position: relative; display: inline-block; vertical-align: middle; isolation: isolate;
-  width: min(260px, 100%); aspect-ratio: 13 / 7; border: 0; padding: 0; border-radius: 18%;
+  width: min(248px, 100%); aspect-ratio: 13 / 7; border: 0; padding: 0; border-radius: 18%;
   background: transparent; color: var(--dsw-alias-label-deep-diving, var(--nb-accent));
-  transition: transform 360ms var(--nb-spring), filter 360ms var(--nb-ease);
+  transition: transform 420ms var(--nb-spring), filter 380ms var(--nb-ease-spatial);
 }
-.dsh-nb button.dsh-nb-particle-whale:hover { transform: translateY(-2px) scale(1.02); filter: drop-shadow(0 8px 18px color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 28%, transparent)); }
-.dsh-nb button.dsh-nb-particle-whale:active { transform: scale(.98); }
+.dsh-nb button.dsh-nb-particle-whale:hover { transform: translateY(-3px) scale(1.03); filter: drop-shadow(0 10px 22px color-mix(in srgb, var(--nb-accent) 26%, transparent)); }
+.dsh-nb button.dsh-nb-particle-whale:active { transform: scale(.97); }
 .dsh-nb-particle-poster { display: block; width: 100%; height: 100%; object-fit: contain; }
 @supports (mask-image: url('')) {
   .dsh-nb-particle-poster { display: none; }
   .dsh-nb-particle-whale::before, .dsh-nb-particle-whale::after {
     position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(135deg, var(--nb-accent) 12%, currentColor 55%, var(--nb-glass-cyan, var(--nb-accent)) 92%);
+    background: linear-gradient(140deg, var(--nb-accent) 14%, currentColor 58%, var(--nb-aurora-indigo) 94%);
   }
   .dsh-nb-particle-whale::before { content: ''; mask: url('${PARTICLE_POSTER}') center / 100% 100% no-repeat; }
   @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
@@ -148,498 +231,581 @@ window.__ModuleLoader__.load({
 @media (forced-colors: active) {
   .dsh-nb-particle-whale::before { background: CanvasText; forced-color-adjust: none; }
 }
-.dsh-nb-activity { position: relative; isolation: isolate; }
-.dsh-nb-activity::before {
-  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle at 30% 30%, color-mix(in srgb, currentColor 22%, transparent), transparent 72%);
-  box-shadow: inset 0 .7px 0 color-mix(in srgb, currentColor 40%, transparent), 0 0 12px color-mix(in srgb, currentColor 22%, transparent);
+
+/* Gemini Expressive Asymmetric Segmented Switch */
+.dsh-nb-pane-tabs { display: none; justify-content: center; flex: none; padding: 2px 12px 8px; }
+.dsh-nb-pane-switch, .dsh-nb-mode, .dsh-nb-tabs {
+  display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; position: relative; isolation: isolate;
+  padding: 3px; border: 1px solid var(--nb-hairline); border-radius: 999px; background: var(--nb-tile);
 }
-@media (forced-colors: active) { .dsh-nb-activity::before { display: none; } }
-.dsh-nb-pane-tabs { display: none; justify-content: center; flex: none; padding: 0 12px 10px; }
-.dsh-nb-pane-switch, .dsh-nb-mode, .dsh-nb-tabs { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; position: relative; isolation: isolate; padding: 3px; border: 1px solid color-mix(in srgb, var(--nb-line) 68%, transparent); border-radius: 999px; }
-.dsh-nb-pane-switch { width: min(100%, 380px); background: color-mix(in srgb, var(--nb-panel) 55%, transparent); backdrop-filter: blur(12px); }
-.dsh-nb-pane-tabs button { padding: 7px 10px; font-size: 12px; font-weight: 450; }
-.dsh-nb-pane-switch button, .dsh-nb-mode button, .dsh-nb-tabs button { position: relative; min-width: 0; border-radius: inherit; color: var(--nb-muted); }
+.dsh-nb-pane-switch { width: min(100%, 380px); background: var(--nb-island); }
+.dsh-nb-pane-tabs button { padding: 7px 10px; font-size: 12px; font-weight: 480; }
+.dsh-nb-pane-switch button, .dsh-nb-mode button, .dsh-nb-tabs button { position: relative; min-width: 0; border-radius: inherit; color: var(--nb-muted); z-index: 1; }
+.dsh-nb-mode button.on, .dsh-nb-pane-tabs button[aria-pressed=true], .dsh-nb-tabs button.on { color: var(--nb-accent-ink); font-weight: 550; }
 .dsh-nb-switch-track { position: absolute; inset: 2px; pointer-events: none; overflow: hidden; border-radius: inherit; }
 .dsh-nb-switch-thumb {
   position: absolute; inset-block: 0;
   left: calc(100% * var(--nb-choice) / var(--nb-choices));
   right: calc(100% * (var(--nb-choices) - var(--nb-choice) - 1) / var(--nb-choices));
-  min-width: 0; border: 1px solid var(--nb-glass-edge); border-radius: 999px;
-  background: linear-gradient(125deg, color-mix(in srgb, var(--nb-accent) 16%, transparent), color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 6%, transparent) 80%), color-mix(in srgb, var(--nb-panel) 88%, transparent);
-  box-shadow: inset 0 1px var(--nb-glass-highlight), 0 2px 8px -2px color-mix(in srgb, var(--nb-fg) 10%, transparent);
+  min-width: 0; border: 1px solid color-mix(in srgb, var(--nb-accent) 22%, var(--nb-hairline)); border-radius: 999px;
+  background: var(--nb-island);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .08);
 }
 @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
   .dsh-nb[data-motion=enabled] .dsh-nb-switch-thumb {
-    --leading: 290ms; --trailing: 430ms;
-    --settle: cubic-bezier(.21,.78,.29,1);
-    transition: left var(--trailing) var(--settle), right var(--leading) var(--settle);
+    --leading: 210ms; --trailing: 440ms;
+    transition: left var(--trailing) var(--nb-spring), right var(--leading) var(--nb-ease-spatial);
   }
-  @supports (transition-timing-function: linear(0, 1)) {
-    .dsh-nb[data-motion=enabled] .dsh-nb-switch-thumb {
-      --settle: linear(0, .043 5%, .165 12%, .395 22%, .66 34%, .86 46%, .978 59%, 1.018 71%, 1.008 85%, 1);
-    }
+  .dsh-nb[data-motion=enabled] .dsh-nb-switch-track[data-backwards=true] .dsh-nb-switch-thumb {
+    transition: left var(--leading) var(--nb-ease-spatial), right var(--trailing) var(--nb-spring);
   }
-  .dsh-nb[data-motion=enabled] .dsh-nb-switch-track[data-backwards=true] .dsh-nb-switch-thumb { transition-duration: var(--leading), var(--trailing); }
 }
-.dsh-nb-grid { flex: 1; min-height: 0; min-width: 0; display: grid; grid-template-columns: var(--nb-left) minmax(0, 1fr) var(--nb-right); gap: 14px; padding: 12px 14px 14px; }
+
+/* Three-Island Spatial Bento Grid & Dual-Side In-Pane Expansion */
+.dsh-nb[data-source-open=true] { --nb-left: clamp(288px, 24cqi, 330px); }
+.dsh-nb[data-studio-open=true] { --nb-right: clamp(290px, 24.5cqi, 334px); }
+.dsh-nb[data-studio-open=true][data-studio-wide=true] { --nb-right: clamp(356px, 33cqi, 448px); }
+@container notebook (max-width: 1180px) {
+  .dsh-nb[data-source-open=true][data-studio-open=true][data-active-side=sources] { --nb-right: clamp(224px, 19cqi, 248px); }
+  .dsh-nb[data-source-open=true][data-studio-open=true][data-active-side=studio] { --nb-left: clamp(224px, 19cqi, 248px); }
+}
+.dsh-nb[data-sources-collapsed=true] { --nb-left: 44px; }
+.dsh-nb[data-studio-collapsed=true] { --nb-right: 44px; }
+.dsh-nb-grid {
+  flex: 1; min-height: 0; min-width: 0; display: grid;
+  grid-template-columns: var(--nb-left) minmax(0, 1fr) var(--nb-right);
+  gap: 12px; padding: 6px 14px 14px;
+}
 @media (prefers-reduced-motion: no-preference) {
-  .dsh-nb[data-motion=enabled] .dsh-nb-grid { transition: grid-template-columns 320ms var(--nb-ease); }
+  .dsh-nb[data-motion=enabled] .dsh-nb-grid { transition: grid-template-columns 480ms var(--nb-ease-spatial); }
 }
-.dsh-nb-col { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
-.dsh-nb-col.is-sources, .dsh-nb-col.is-studio {
-  border: 1px solid var(--nb-glass-edge, var(--nb-line)); border-radius: 20px;
-  background-color: var(--nb-panel);
-  box-shadow: 0 8px 28px -16px color-mix(in srgb, var(--nb-fg) 18%, transparent);
+.dsh-nb-col {
+  position: relative; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--nb-hairline); border-radius: 20px;
+  background-color: var(--nb-island); box-shadow: var(--nb-island-shadow);
 }
-.dsh-nb-head { flex: none; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 14px; }
+.dsh-nb-head {
+  flex: none; display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--nb-hairline) 68%, transparent);
+}
 .dsh-nb-head > .dsh-nb-icon-button { margin-left: auto; }
-.dsh-nb-title { font-weight: 520; letter-spacing: -.01em; }
+.dsh-nb-title { font-weight: 550; letter-spacing: -.01em; font-size: 13.5px; }
 .dsh-nb-head .dsh-nb-title { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; min-width: 0; }
 .dsh-nb-head .dsh-nb-meta { font-size: 11px; }
 .dsh-nb-head .dsh-nb-scope {
   margin-left: auto; white-space: nowrap; padding: 3px 9px; border-radius: 999px;
-  background: color-mix(in srgb, var(--nb-soft) 58%, transparent);
-  border: 1px solid color-mix(in srgb, var(--nb-line) 55%, transparent);
+  background: var(--nb-tile); border: 1px solid var(--nb-hairline);
 }
 .dsh-nb-count {
-  min-width: 20px; padding: 1px 6px; border: 1px solid var(--nb-glass-edge, var(--nb-line));
-  border-radius: 999px; font-size: 11px; font-variant-numeric: tabular-nums; text-align: center;
-  color: var(--nb-accent-ink, var(--nb-accent)); background: var(--nb-accent-soft);
+  min-width: 20px; padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 520; font-variant-numeric: tabular-nums; text-align: center;
+  color: var(--nb-muted); background: var(--nb-tile);
 }
-.dsh-nb-source-tools-row { display: grid; grid-template-columns: minmax(0, 1fr) 34px; gap: 8px; padding: 0 13px 12px; }
-.dsh-nb-source-tools-row .dsh-nb-icon-button { width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--nb-line) 65%, transparent); background: color-mix(in srgb, var(--nb-panel) 50%, transparent); }
-.dsh-nb-source-tools-row .dsh-nb-build-entry { grid-column: 1 / -1; min-height: 36px; font-weight: 500; }
-.dsh-nb-source-search { padding: 0 13px; }
+
+/* Shared-Axis Dual-Layer Stack for Sources & Studio In-Pane Views */
+.dsh-nb-pane-list {
+  flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column;
+  transition: transform 400ms var(--nb-ease-spatial), opacity 220ms ease, filter 140ms ease-out, visibility 400ms;
+}
+.dsh-nb-pane-list.is-recessed {
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: translateX(-18px) scale(.975); filter: blur(2.5px);
+}
+.dsh-nb-inpane {
+  position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  background-color: var(--nb-island);
+}
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .is-sources .dsh-nb-inpane { animation: dsh-nb-inpane-left 440ms var(--nb-ease-spatial) both; }
+  .dsh-nb[data-motion=enabled] .is-studio .dsh-nb-inpane { animation: dsh-nb-inpane-right 440ms var(--nb-ease-spatial) both; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-inpane-body > * { animation: dsh-nb-materialize 420ms var(--nb-ease-spatial) both; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-inpane-body > :nth-child(2) { animation-delay: 45ms; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-inpane-body > :nth-child(n+3) { animation-delay: 85ms; }
+}
+@keyframes dsh-nb-inpane-left {
+  0% { opacity: 0; transform: translateX(-24px) scale(.98); filter: blur(4px); }
+  38% { filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes dsh-nb-inpane-right {
+  0% { opacity: 0; transform: translateX(26px) scale(.98); filter: blur(4px); }
+  38% { filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes dsh-nb-materialize {
+  0% { opacity: 0; transform: translateY(13px) scale(.985); filter: blur(4px); }
+  38% { filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: blur(0); }
+}
+.dsh-nb-inpane-head {
+  flex: none; display: flex; align-items: center; gap: 6px; height: 46px; padding: 0 10px 0 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--nb-hairline) 72%, transparent);
+}
+.dsh-nb button.dsh-nb-inpane-back {
+  display: inline-flex; align-items: center; gap: 3px; padding: 5px 9px 5px 7px; flex: none;
+  border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--nb-muted); background: var(--nb-tile);
+}
+.dsh-nb button.dsh-nb-inpane-back:hover { color: var(--nb-fg); background: var(--nb-tile-hover); transform: translateX(-1.5px); }
+.dsh-nb-inpane-head h3 { font-size: 13.5px; font-weight: 560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.dsh-nb-inpane-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; flex: none; }
+.dsh-nb-inpane-body { flex: 1; min-height: 0; overflow: auto; padding: 14px; display: grid; gap: 13px; align-content: start; }
+
+/* Cross-Pane Citation Evidence Spotlight */
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .dsh-nb-source-detail.is-spotlight .dsh-nb-source-body {
+    border-left: 3px solid var(--nb-accent); padding-left: 12px; border-radius: 0 10px 10px 0;
+    animation: dsh-nb-citation-spotlight 1500ms var(--nb-ease-spatial) both;
+  }
+}
+@keyframes dsh-nb-citation-spotlight {
+  0% { background-color: color-mix(in srgb, var(--nb-accent) 22%, transparent); box-shadow: -4px 0 18px -4px color-mix(in srgb, var(--nb-accent) 45%, transparent); }
+  100% { background-color: color-mix(in srgb, var(--nb-accent) 4%, transparent); box-shadow: none; }
+}
+
+/* Left Sources Island: Side-by-side Capsule Row + Airy Borderless Document Rows */
+.dsh-nb-source-tools-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px;
+  gap: 6px; padding: 10px 10px 8px;
+}
+.dsh-nb-source-tools-row > button.dsh-nb-chip {
+  min-height: 33px; padding: 0 7px; font-size: 12px; gap: 4px; white-space: nowrap; min-width: 0;
+}
+.dsh-nb-source-tools-row .dsh-nb-icon-button {
+  width: 32px; height: 33px; border: 1px solid var(--nb-hairline); background: var(--nb-tile);
+}
+.dsh-nb-source-search { padding: 0 10px; }
 .dsh-nb-source-search .dsh-nb-field {
-  border-color: color-mix(in srgb, var(--nb-line) 45%, transparent); border-radius: 999px; padding-inline: 14px;
-  background: color-mix(in srgb, var(--nb-soft) 40%, transparent); font-size: 12px; min-height: 34px;
+  border-color: transparent; border-radius: 999px; padding-inline: 13px;
+  background: var(--nb-tile); font-size: 12px; min-height: 33px;
 }
-.dsh-nb-source-search .dsh-nb-field:focus { border-color: color-mix(in srgb, var(--nb-accent) 55%, transparent); background: color-mix(in srgb, var(--nb-bg) 60%, transparent); outline: none; }
-.dsh-nb-source-summary { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; color: var(--nb-muted); padding: 12px 15px 6px; }
-.dsh-nb-source-summary label { display: inline-flex; gap: 7px; align-items: center; cursor: pointer; }
+.dsh-nb-source-search .dsh-nb-field:focus {
+  border-color: color-mix(in srgb, var(--nb-accent) 52%, transparent);
+  background: var(--nb-island); outline: none;
+}
+.dsh-nb-source-summary { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; color: var(--nb-muted); padding: 10px 13px 5px; }
+.dsh-nb-source-summary label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 .dsh-nb-check { width: 14px; height: 14px; margin: 0; flex: none; accent-color: var(--nb-accent); cursor: pointer; }
-.dsh-nb-scroll { flex: 1; min-height: 0; overflow: auto; padding: 2px 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+.dsh-nb-scroll { flex: 1; min-height: 0; overflow: auto; padding: 2px 7px 10px; display: flex; flex-direction: column; gap: 2px; }
 .dsh-nb-source {
-  display: flex; align-items: center; gap: 8px; padding: 9px 9px; border-radius: 12px;
-  border: 1px solid transparent; transition: background-color 160ms var(--nb-ease), border-color 160ms var(--nb-ease), transform 160ms var(--nb-ease);
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 12px;
+  border: 1px solid transparent;
+  transition: background-color 200ms var(--nb-ease-spatial), transform 220ms var(--nb-ease-spatial);
 }
-.dsh-nb-source:hover { background: color-mix(in srgb, var(--nb-soft) 68%, transparent); border-color: color-mix(in srgb, var(--nb-line) 55%, transparent); }
-.dsh-nb-source:has(.dsh-nb-check:checked) { background: color-mix(in srgb, var(--nb-accent) 6%, transparent); border-color: color-mix(in srgb, var(--nb-accent) 16%, transparent); }
-.dsh-nb-source-open { flex: 1; min-width: 0; display: flex; gap: 10px; align-items: center; text-align: left; }
+.dsh-nb-source:hover { background: var(--nb-tile); }
+.dsh-nb-source.is-active { background: color-mix(in srgb, var(--nb-accent) 9%, var(--nb-island)); border-color: color-mix(in srgb, var(--nb-accent) 22%, transparent); }
+.dsh-nb-source-open { flex: 1; min-width: 0; display: flex; gap: 9px; align-items: center; text-align: left; }
 .dsh-nb-mark {
-  display: inline-grid; place-items: center; flex: none; width: 28px; height: 30px;
-  border: 1px solid color-mix(in srgb, var(--nb-line) 75%, transparent); border-radius: 9px;
-  color: var(--nb-muted); background: color-mix(in srgb, var(--nb-panel) 65%, transparent);
-  transition: color 160ms var(--nb-ease), border-color 160ms var(--nb-ease), background-color 160ms var(--nb-ease);
+  display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px;
+  border-radius: 8px; color: var(--nb-muted); background: var(--nb-tile);
+  transition: color 200ms var(--nb-ease-spatial), background-color 200ms var(--nb-ease-spatial), transform 260ms var(--nb-spring);
 }
-.dsh-nb-source:has(.dsh-nb-check:checked) .dsh-nb-mark { color: var(--nb-accent); border-color: color-mix(in srgb, var(--nb-accent) 32%, transparent); background: var(--nb-accent-soft); }
-.dsh-nb-copy { display: grid; gap: 2px; min-width: 0; }
-.dsh-nb-copy .dsh-nb-title { display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 13px; font-weight: 450; }
+.dsh-nb-source:hover .dsh-nb-mark { transform: scale(1.05); }
+.dsh-nb-source:has(.dsh-nb-check:checked) .dsh-nb-mark {
+  color: var(--nb-accent); background: color-mix(in srgb, var(--nb-accent) 13%, var(--nb-island));
+}
+.dsh-nb-copy { display: grid; gap: 1.5px; min-width: 0; }
+.dsh-nb-copy .dsh-nb-title { display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 12.5px; font-weight: 470; }
 .dsh-nb-copy .dsh-nb-meta { font-size: 11px; opacity: .85; }
-.dsh-nb-foot { font-size: 11px; color: var(--nb-muted); padding: 10px 15px 14px; flex: none; border-top: 1px solid color-mix(in srgb, var(--nb-line) 42%, transparent); }
-.dsh-nb-rail { display: none; flex-direction: column; align-items: center; gap: 14px; padding-top: 10px; color: var(--nb-muted); font-size: 11px; }
-.dsh-nb-rail > span:last-child { padding: 2px 6px; border-radius: 999px; background: var(--nb-accent-soft); color: var(--nb-accent); font-variant-numeric: tabular-nums; }
-.dsh-nb[data-sources-collapsed=true] { --nb-left: 44px; }
-.dsh-nb[data-studio-collapsed=true] { --nb-right: 44px; }
-.dsh-nb[data-sources-collapsed=true] .is-sources > :not(.dsh-nb-rail), .dsh-nb[data-studio-collapsed=true] .is-studio > :not(.dsh-nb-rail) { display: none; }
-.dsh-nb[data-sources-collapsed=true] .is-sources .dsh-nb-rail, .dsh-nb[data-studio-collapsed=true] .is-studio .dsh-nb-rail { display: flex; }
-.dsh-nb-thread { flex: 1; min-height: 0; overflow: auto; padding: 6px 18px 20px; overflow-wrap: anywhere; }
+.dsh-nb-foot { font-size: 11px; color: var(--nb-muted); padding: 9px 13px 11px; flex: none; border-top: 1px solid color-mix(in srgb, var(--nb-hairline) 68%, transparent); }
+
+/* Collapsed Side Rails */
+.dsh-nb-rail { display: none; flex-direction: column; align-items: center; gap: 14px; padding-top: 8px; color: var(--nb-muted); font-size: 11px; }
+.dsh-nb-rail > span:last-child { padding: 2px 6px; border-radius: 999px; background: var(--nb-accent-soft); color: var(--nb-accent-ink); font-variant-numeric: tabular-nums; }
+.dsh-nb[data-sources-collapsed=true] .is-sources > :not(.dsh-nb-rail),
+.dsh-nb[data-studio-collapsed=true] .is-studio > :not(.dsh-nb-rail) { display: none; }
+.dsh-nb[data-sources-collapsed=true] .is-sources .dsh-nb-rail,
+.dsh-nb[data-studio-collapsed=true] .is-studio .dsh-nb-rail { display: flex; }
+
+/* Center Conversation Island: Editorial Thread + Floating Pill Composer */
+.dsh-nb-thread { flex: 1; min-height: 0; overflow: auto; padding: 14px 22px 16px; overflow-wrap: anywhere; }
 .dsh-nb-thread:has(> .dsh-nb-hero) { display: flex; flex-direction: column; }
-.dsh-nb-hero { flex: none; margin-block: auto; text-align: center; padding: 24px 0 44px; position: relative; }
-.dsh-nb-hero-mark { position: relative; display: grid; place-items: center; isolation: isolate; margin: 0 auto 18px; width: min(320px, 100%); height: 146px; color: var(--nb-accent); }
-.dsh-nb-hero h2 { font-size: clamp(23px, 2.3cqi, 31px); line-height: 1.38; font-weight: 500; letter-spacing: -.03em; margin: 8px 0 10px; }
-.dsh-nb-hero .dsh-nb-meta { max-width: 34em; margin: auto; font-size: 13px; line-height: 1.7; }
-.dsh-nb-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 24px; }
+.dsh-nb-hero { flex: none; margin-block: auto; text-align: center; padding: 20px 0 36px; position: relative; }
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .dsh-nb-hero > :not(.dsh-nb-hero-mark) { animation: dsh-nb-materialize 460ms var(--nb-ease-spatial) both; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-hero > .dsh-nb-suggest { animation-delay: 65ms; }
+}
+.dsh-nb-hero-mark { position: relative; display: grid; place-items: center; isolation: isolate; margin: 0 auto 14px; width: min(296px, 100%); height: 134px; color: var(--nb-accent); }
+.dsh-nb-hero h2 { font-size: clamp(22px, 2.2cqi, 28px); line-height: 1.36; font-weight: 560; letter-spacing: -.025em; margin: 6px 0 8px; }
+.dsh-nb-hero .dsh-nb-meta { max-width: 34em; margin: auto; font-size: 13px; line-height: 1.68; }
+.dsh-nb-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 22px; }
 .dsh-nb-suggest button {
-  border: 1px solid var(--nb-glass-edge, var(--nb-line)); padding: 8px 14px; border-radius: 999px; font-size: 12px;
-  background: color-mix(in srgb, var(--nb-panel) 62%, transparent); box-shadow: inset 0 1px 0 var(--nb-glass-highlight, transparent);
+  border: 1px solid var(--nb-hairline); padding: 8px 14px; border-radius: 999px; font-size: 12px;
+  background: var(--nb-tile); color: var(--nb-fg);
 }
 .dsh-nb-suggest button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--nb-accent) 58%, transparent);
-  background: color-mix(in srgb, var(--nb-accent) 10%, var(--nb-panel));
-  transform: translateY(-1.5px);
+  border-color: color-mix(in srgb, var(--nb-accent) 48%, transparent);
+  background: var(--nb-tile-hover);
+  transform: translateY(-2px);
 }
-.dsh-nb-message { margin: 0 0 24px; min-width: 0; animation: dsh-nb-enter 220ms var(--nb-ease) both; }
+.dsh-nb-messages, .dsh-nb-research { width: 100%; max-width: 49em; margin-inline: auto; }
+.dsh-nb-message { margin: 0 0 22px; min-width: 0; }
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .dsh-nb-message.user { animation: dsh-nb-launch 360ms var(--nb-ease-spatial) both; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-message.assistant { animation: dsh-nb-materialize 460ms var(--nb-ease-spatial) both; }
+}
+@keyframes dsh-nb-launch {
+  from { opacity: 0; transform: translateY(14px) scale(.975); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
 .dsh-nb-message.user {
-  background: var(--nb-soft); border-radius: 18px 18px 4px 18px; padding: 11px 16px;
-  width: fit-content; max-width: 88%; margin-left: auto;
+  background: color-mix(in srgb, var(--nb-accent) 10%, var(--nb-tile));
+  border-radius: 20px 20px 6px 20px; padding: 11px 16px;
+  width: fit-content; max-width: 86%; margin-left: auto;
 }
-.dsh-nb-message.assistant {
-  position: relative; padding-left: 16px;
-}
-.dsh-nb-message.assistant::before {
-  content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; border-radius: 2px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--nb-accent) 65%, transparent), color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 28%, transparent) 60%, transparent);
-}
-.dsh-nb-message-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 500; color: var(--nb-muted); margin-bottom: 6px; letter-spacing: .01em; }
-.dsh-nb-message.assistant .dsh-nb-message-meta span:first-child { color: var(--nb-accent-ink, var(--nb-accent)); }
-.dsh-nb-messages, .dsh-nb-research { width: 100%; max-width: 52em; margin-inline: auto; }
+.dsh-nb-message.user .dsh-nb-message-meta { display: none; }
+.dsh-nb-message.assistant { position: relative; padding-left: 0; }
+.dsh-nb-message-meta { display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 550; color: var(--nb-muted); margin-bottom: 7px; }
+.dsh-nb-message.assistant .dsh-nb-message-meta span:first-child { color: var(--nb-accent-ink); }
 .dsh-nb-message-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--dsh-content-font-size, 14px); line-height: calc(25px + var(--dsh-content-font-delta, 0px)); }
 .dsh-nb-message.is-failed .dsh-nb-message-body { color: var(--nb-danger); }
-.dsh-nb-message-actions { margin-top: 10px; opacity: .72; transition: opacity 180ms var(--nb-ease); }
+.dsh-nb-message-actions { margin-top: 8px; opacity: .76; transition: opacity 180ms var(--nb-ease); }
 .dsh-nb-message.assistant:hover .dsh-nb-message-actions, .dsh-nb-message-actions:focus-within { opacity: 1; }
 .dsh-nb-message-actions .dsh-nb-quiet { color: var(--nb-muted); font-size: 11px; padding: 4px 9px; min-height: 26px; }
+
+/* Inline Numbered Citation Pills with Tactile Shockwave */
 .dsh-nb button.dsh-nb-citation {
   display: inline-flex; align-items: center; justify-content: center; vertical-align: 1px;
-  font-size: 11px; font-weight: 550; font-variant-numeric: tabular-nums;
-  min-width: 18px; height: 18px; padding: 0 5px; margin: 0 2px;
-  background: var(--nb-accent-soft); border: 1px solid color-mix(in srgb, var(--nb-accent) 26%, transparent);
-  border-radius: 999px; color: var(--nb-accent);
+  font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+  min-width: 19px; height: 19px; padding: 0 6px; margin: 0 2px;
+  background: color-mix(in srgb, var(--nb-accent) 13%, var(--nb-island));
+  border: 1px solid color-mix(in srgb, var(--nb-accent) 24%, transparent);
+  border-radius: 999px; color: var(--nb-accent-ink);
+  transition: transform 280ms var(--nb-spring), background-color 180ms ease, box-shadow 260ms ease;
 }
-.dsh-nb button.dsh-nb-citation:hover { background: color-mix(in srgb, var(--nb-accent) 22%, transparent); border-color: color-mix(in srgb, var(--nb-accent) 55%, transparent); transform: translateY(-1px); }
+.dsh-nb button.dsh-nb-citation:hover {
+  background: var(--nb-accent); color: #ffffff; border-color: transparent;
+  transform: translateY(-1.5px) scale(1.1);
+  box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--nb-accent) 45%, transparent);
+}
+.dsh-nb button.dsh-nb-citation:active { transform: scale(.92); }
+
+/* Auto-Research Card & Smooth Accordion Details */
 .dsh-nb-research {
-  border: 1px solid var(--nb-glass-edge, var(--nb-line)); border-radius: 16px;
-  padding: 14px 16px; margin-block: 6px 22px; display: grid; gap: 10px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--nb-accent) 5%, transparent), transparent 55%), color-mix(in srgb, var(--nb-panel) 58%, transparent);
-  box-shadow: inset 0 1px 0 var(--nb-glass-highlight, transparent);
-  animation: dsh-nb-enter 200ms var(--nb-ease) both;
+  border: 1px solid var(--nb-hairline); border-radius: 16px;
+  padding: 14px 16px; margin-block: 4px 20px; display: grid; gap: 10px;
+  background: var(--nb-tile);
+  animation: dsh-nb-materialize 440ms var(--nb-ease-spatial) both;
 }
-.dsh-nb-research.is-running { border-color: color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 35%, transparent); }
+.dsh-nb-research.is-running {
+  border-color: color-mix(in srgb, var(--nb-accent) 40%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--nb-accent) 7%, var(--nb-tile)), var(--nb-tile));
+}
 .dsh-nb-research-goal { font-size: 13px; line-height: 1.7; color: var(--nb-fg); white-space: pre-wrap; overflow-wrap: anywhere; }
 .dsh-nb-research-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; font-size: 13px; }
-.dsh-nb-research-heading strong { font-weight: 550; color: var(--nb-accent); }
-.dsh-nb-research details { font-size: 12px; }
-.dsh-nb-research summary { cursor: pointer; color: var(--nb-muted); padding: 2px 0; }
+.dsh-nb-research-heading strong { font-weight: 560; color: var(--nb-accent-ink); }
+.dsh-nb-research details, .dsh-nb-study-history { font-size: 12px; interpolate-size: allow-keywords; }
+.dsh-nb-research summary, .dsh-nb-study-history summary { cursor: pointer; color: var(--nb-muted); padding: 3px 0; font-weight: 500; transition: color 160ms ease; }
+.dsh-nb-research summary:hover, .dsh-nb-study-history summary:hover { color: var(--nb-fg); }
+@supports selector(::details-content) {
+  @media (prefers-reduced-motion: no-preference) {
+    .dsh-nb[data-motion=enabled] :is(.dsh-nb-research details, .dsh-nb-study-history)::details-content {
+      block-size: 0; opacity: 0; overflow: clip;
+      transition: block-size 360ms var(--nb-ease-spatial), opacity 280ms ease, content-visibility 360ms allow-discrete;
+    }
+    .dsh-nb[data-motion=enabled] :is(.dsh-nb-research details, .dsh-nb-study-history)[open]::details-content {
+      block-size: auto; opacity: 1;
+    }
+  }
+}
 .dsh-nb-research ul { margin: 8px 0; padding-left: 18px; display: grid; gap: 8px; }
 .dsh-nb-research li { overflow-wrap: anywhere; }
-.dsh-nb-research li button { text-align: left; color: var(--nb-accent); }
+.dsh-nb-research li button { text-align: left; color: var(--nb-accent-ink); font-weight: 500; }
+.dsh-nb-research li button:hover:not(:disabled) { text-decoration: underline; }
 .dsh-nb-research-error { font-size: 12px; color: var(--nb-danger); overflow-wrap: anywhere; }
 .dsh-nb-research-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 2px; }
 .dsh-nb-form label.dsh-nb-inline-check { display: flex; flex-direction: row; align-items: center; gap: 9px; cursor: pointer; }
-.dsh-nb-composer { flex: none; margin: 0 4px; padding: 13px 14px 10px; background: var(--nb-panel); border: 0; border-radius: 22px; box-shadow: var(--dsw-elevation-soft, 0 0 0 .5px var(--nb-line)); }
-.dsh-nb-composer:focus-within { box-shadow: 0 0 0 1px color-mix(in srgb, var(--nb-accent) 55%, var(--nb-line)); }
-.dsh-nb-composer textarea { width: 100%; display: block; min-height: 44px; max-height: 140px; resize: none; padding: 0 2px; border: 0; background: transparent; font-size: 14px; line-height: 1.55; }
+
+/* Docked Floating Pill Composer + Pronounced Gemini Deep-Sea Aurora Rim */
+.dsh-nb-composer {
+  position: relative; isolation: isolate; flex: none; margin: 0 16px 6px; padding: 12px 15px 10px;
+  background-color: var(--nb-composer-bg); border: 1px solid var(--nb-hairline); border-radius: 24px;
+  box-shadow: 0 4px 18px -8px rgba(0, 0, 0, .14);
+  transition: border-color 260ms var(--nb-ease-spatial), box-shadow 320ms var(--nb-ease-spatial), transform 280ms var(--nb-ease-spatial);
+}
+.dsh-nb-composer:focus-within {
+  border-color: color-mix(in srgb, var(--nb-accent) 58%, var(--nb-line));
+  box-shadow: 0 8px 28px -10px color-mix(in srgb, var(--nb-accent) 30%, transparent), 0 0 0 3px color-mix(in srgb, var(--nb-accent) 12%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) and (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .dsh-nb-composer::after {
+    content: ''; position: absolute; inset: -1.5px; border-radius: 25.5px; padding: 2px;
+    background: conic-gradient(from var(--nb-aura-angle), transparent 6%, var(--nb-accent) 32%, var(--nb-aurora-sky) 50%, var(--nb-aurora-indigo) 68%, transparent 88%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    opacity: 0; pointer-events: none;
+    transition: opacity 280ms ease;
+  }
+  .dsh-nb[data-motion=enabled] .dsh-nb-composer:focus-within::after {
+    opacity: .82;
+    animation: dsh-nb-focus-aura 1050ms var(--nb-ease-spatial) 1 forwards;
+  }
+  .dsh-nb[data-motion=enabled][data-running=true] .dsh-nb-composer {
+    border-color: transparent;
+    box-shadow: 0 10px 32px -8px color-mix(in srgb, var(--nb-accent) 36%, transparent);
+  }
+  .dsh-nb[data-motion=enabled][data-running=true] .dsh-nb-composer::after {
+    opacity: 1;
+    animation: dsh-nb-spin-aura 1.95s linear infinite;
+  }
+}
+@keyframes dsh-nb-focus-aura {
+  0% { --nb-aura-angle: 0deg; opacity: .95; }
+  80% { opacity: .85; }
+  100% { --nb-aura-angle: 360deg; opacity: 0; }
+}
+@keyframes dsh-nb-spin-aura { to { --nb-aura-angle: 360deg; } }
+.dsh-nb-composer textarea {
+  width: 100%; display: block; min-height: 44px; max-height: 140px; resize: none; padding: 0 2px;
+  border: 0; background: transparent;
+  font-size: var(--dsh-content-font-size, 14px); line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  transition: height 170ms var(--nb-ease-spatial);
+}
+.dsh-nb-composer textarea::placeholder { color: var(--nb-muted); opacity: .86; }
 .dsh-nb-composer textarea:focus-visible { outline: none; }
-.dsh-nb-composer-bottom { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
-.dsh-nb-mode { background: var(--nb-bg); }
-.dsh-nb-mode button { padding: 4px 10px; font-size: 11px; font-weight: 450; white-space: nowrap; }
+.dsh-nb-composer-bottom { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 9px; }
+.dsh-nb-mode { background: color-mix(in srgb, var(--nb-canvas) 75%, var(--nb-island)); }
+.dsh-nb-mode button { padding: 4px 10px; font-size: 11px; white-space: nowrap; }
+.dsh-nb-composer-trailing { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-left: auto; min-width: 0; max-width: 100%; }
 .dsh-nb-model { min-width: 0; flex: 1; max-width: 210px; }
-.dsh-nb option, .dsh-nb optgroup { background: var(--nb-panel); color: var(--nb-fg); }
-.dsh-nb button.dsh-nb-send { margin-left: auto; flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 999px; background: var(--nb-accent); color: var(--nb-bg); }
-.dsh-nb button.dsh-nb-send:disabled { background: var(--nb-soft); color: var(--nb-muted); opacity: 1; }
-.dsh-nb button.dsh-nb-stop { margin-left: auto; }
-.dsh-nb-composer-hint { flex: none; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; padding: 7px 12px 0; font-size: 11px; color: var(--nb-muted); opacity: .82; }
-.dsh-nb-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none; margin: 6px 4px 10px; padding: 9px 13px; border: 1px solid color-mix(in srgb, var(--nb-line) 70%, transparent); border-radius: 12px; font-size: 12px; color: var(--nb-muted); background: color-mix(in srgb, var(--nb-panel) 65%, transparent); overflow-wrap: anywhere; }
+.dsh-nb-composer .dsh-nb-model { flex: 0 1 auto; max-width: min(210px, 36cqi); }
+@container notebook (max-width: 380px) { .dsh-nb-composer .dsh-nb-model { max-width: 24cqi; } }
+.dsh-nb option, .dsh-nb optgroup { background: var(--nb-island); color: var(--nb-fg); }
+.dsh-nb button.dsh-nb-send, .dsh-nb button.dsh-nb-stop { flex: none; margin-left: 0; border-radius: 999px; }
+.dsh-nb button.dsh-nb-send {
+  width: 34px; height: 34px; display: grid; place-items: center; color: #ffffff;
+  background: var(--dsw-alias-button-info-fill, #3d68d8);
+  box-shadow: 0 3px 10px -2px color-mix(in srgb, var(--dsw-alias-button-info-fill, #3d68d8) 48%, transparent);
+}
+.dsh-nb button.dsh-nb-send:disabled { background: var(--nb-tile); color: var(--nb-muted); opacity: 1; box-shadow: none; }
+@media (hover: hover) {
+  .dsh-nb button.dsh-nb-send:not(:disabled):hover { transform: translateY(-1.5px) scale(1.04); filter: brightness(1.07); }
+  .dsh-nb button.dsh-nb-send:not(:disabled):active { transform: scale(.93); }
+}
+.dsh-nb-composer-hint { flex: none; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; padding: 3px 22px 11px; font-size: 11px; color: var(--nb-muted); opacity: .84; }
+.dsh-nb-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none; margin: 4px 16px 10px; padding: 9px 13px; border: 1px solid var(--nb-hairline); border-radius: 14px; font-size: 12px; color: var(--nb-muted); background: var(--nb-tile); overflow-wrap: anywhere; animation: dsh-nb-enter 220ms var(--nb-ease-spatial) both; }
 .dsh-nb-status > span { min-width: 0; }
 .dsh-nb-status .dsh-nb-chip { flex: none; }
-.dsh-nb-status.dsh-nb-error { color: var(--nb-danger); border-color: color-mix(in srgb, var(--nb-danger) 35%, transparent); background: color-mix(in srgb, var(--nb-danger) 6%, var(--nb-panel)); }
-.dsh-nb-studio { container: studio / inline-size; flex: 1; min-height: 0; overflow: auto; padding: 2px 13px 16px; }
-.dsh-nb-studio-content, .dsh-nb .is-studio > .dsh-nb-head { width: 100%; max-width: 624px; margin-inline: auto; }
-.dsh-nb .is-studio > .dsh-nb-head { max-width: 648px; }
-.dsh-nb-studio-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-bottom: 16px; }
-.dsh-nb-studio [data-studio-kind] { --studio-ink: color-mix(in srgb, var(--nb-accent) 55%, #8e79c7); --studio-shape: 11px 15px 11px 15px; }
-.dsh-nb-studio :is([data-studio-kind=flashcards], [data-studio-kind=quiz]) { --studio-ink: color-mix(in srgb, var(--nb-fg) 38%, #cf875b); --studio-shape: 48% 48% 11px 11px; }
-.dsh-nb-studio :is([data-studio-kind=mind-map], [data-studio-kind=data-table]) { --studio-ink: color-mix(in srgb, var(--nb-fg) 34%, #408e82); --studio-shape: 15px 8px 15px 8px; }
+.dsh-nb-status.dsh-nb-error { color: var(--nb-danger); border-color: color-mix(in srgb, var(--nb-danger) 35%, transparent); background: color-mix(in srgb, var(--nb-danger) 7%, var(--nb-island)); }
+
+/* Compact Right Studio Island: Featured Guide + 2-Column Horizontal Bento Tiles */
+.dsh-nb-studio { container: studio / inline-size; flex: 1; min-height: 0; overflow: auto; padding: 10px 10px 14px; }
+.dsh-nb-studio-content, .dsh-nb .is-studio > .dsh-nb-pane-list > .dsh-nb-head { width: 100%; max-width: 624px; margin-inline: auto; }
+.dsh-nb-studio-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-bottom: 12px; }
+.dsh-nb-studio [data-studio-kind] { --studio-ink: color-mix(in srgb, var(--nb-accent) 62%, #8e79c7); --studio-shape: 9px; }
+.dsh-nb-studio :is([data-studio-kind=flashcards], [data-studio-kind=quiz]) { --studio-ink: color-mix(in srgb, var(--nb-fg) 30%, #cf8456); --studio-shape: 10px 10px 8px 8px; }
+.dsh-nb-studio :is([data-studio-kind=mind-map], [data-studio-kind=data-table]) { --studio-ink: color-mix(in srgb, var(--nb-fg) 28%, #3c9184); --studio-shape: 10px 7px 10px 7px; }
 .dsh-nb button.dsh-nb-card {
-  position: relative; overflow: hidden; min-width: 0; border-radius: 16px; padding: 9px 4px 10px; min-height: 70px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
-  border: 1px solid color-mix(in srgb, var(--nb-line) 48%, transparent);
-  background: color-mix(in srgb, var(--nb-panel) 48%, transparent);
+  position: relative; isolation: isolate; overflow: hidden; min-width: 0; border-radius: 13px; padding: 8px 8px; min-height: 44px;
+  display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 7px;
+  border: 1px solid transparent; background: var(--nb-tile); text-align: left;
 }
-.dsh-nb-card strong { font-size: 12px; font-weight: 475; line-height: 1.45; }
-.dsh-nb button.dsh-nb-card[aria-busy=true] { border-color: color-mix(in srgb, var(--studio-ink) 48%, transparent); }
-.dsh-nb-card[aria-busy=true] .dsh-nb-ico { box-shadow: 0 0 12px color-mix(in srgb, var(--studio-ink) 35%, transparent), inset 0 0 0 1px currentColor; }
-.dsh-nb-ico { display: inline-grid; flex: none; place-items: center; width: 36px; height: 32px; border-radius: var(--studio-shape); color: var(--studio-ink); background: color-mix(in srgb, var(--studio-ink) 14%, var(--nb-panel)); }
-.dsh-nb-ico svg { width: 18px; height: 18px; }
+.dsh-nb-card strong { font-size: 12px; font-weight: 500; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dsh-nb-ico {
+  display: inline-grid; flex: none; place-items: center; width: 24px; height: 24px;
+  border-radius: var(--studio-shape); color: var(--studio-ink);
+  background: color-mix(in srgb, var(--studio-ink) 14%, var(--nb-island));
+}
+.dsh-nb-ico svg { width: 14px; height: 14px; }
 .dsh-nb button.dsh-nb-guide-card {
-  grid-column: 1 / -1; position: relative; isolation: isolate; overflow: hidden; align-items: flex-start; gap: 4px;
-  min-height: 90px; margin-bottom: 3px; padding: 15px 86px 15px 16px; text-align: left;
-  background: linear-gradient(115deg, color-mix(in srgb, var(--nb-accent) 12%, var(--nb-panel)), color-mix(in srgb, var(--studio-ink) 18%, var(--nb-panel)));
-  border: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--studio-ink) 24%, transparent), inset 0 1px var(--nb-glass-highlight);
+  grid-column: 1 / -1; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px;
+  min-height: 78px; margin-bottom: 2px; padding: 13px 72px 13px 14px; border-radius: 15px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--nb-accent) 11%, var(--nb-tile)), color-mix(in srgb, var(--studio-ink) 14%, var(--nb-tile)));
+  border: 1px solid color-mix(in srgb, var(--studio-ink) 22%, transparent);
 }
-.dsh-nb-guide-card strong { font-size: 16px; font-weight: 560; letter-spacing: -.02em; }
-.dsh-nb-guide-card small { font-size: 12px; line-height: 1.5; color: var(--nb-muted); }
-.dsh-nb-guide-art { position: absolute; pointer-events: none; z-index: -1; right: 8px; top: 50%; width: 80px; height: 64px; translate: 0 -50%; color: var(--studio-ink); }
+.dsh-nb-guide-card strong { font-size: 14.5px; font-weight: 560; letter-spacing: -.015em; }
+.dsh-nb-guide-card small { font-size: 11.5px; line-height: 1.45; color: var(--nb-muted); }
+.dsh-nb-guide-art { position: absolute; pointer-events: none; z-index: -1; right: 6px; top: 50%; width: 70px; height: 58px; translate: 0 -50%; color: var(--studio-ink); }
 .dsh-nb-guide-sheet, .dsh-nb-guide-art::before {
-  content: ''; position: absolute; left: 22px; top: 9px; width: 37px; height: 45px; border-radius: 3px 6px 6px 3px;
-  border: 1px solid color-mix(in srgb, currentColor 56%, var(--nb-panel));
+  content: ''; position: absolute; left: 20px; top: 8px; width: 33px; height: 41px; border-radius: 3px 6px 6px 3px;
+  border: 1px solid color-mix(in srgb, currentColor 52%, var(--nb-island));
 }
-.dsh-nb-guide-art::before { transform: translate(-6px, 0) rotate(-14deg); background: color-mix(in srgb, currentColor 15%, var(--nb-panel)); }
+.dsh-nb-guide-art::before { transform: translate(-5px, 0) rotate(-14deg); background: color-mix(in srgb, currentColor 14%, var(--nb-island)); }
 .dsh-nb-guide-sheet {
-  transform: rotate(12deg); background: linear-gradient(130deg, color-mix(in srgb, currentColor 18%, var(--nb-panel)), var(--nb-panel)); box-shadow: -2px 4px 6px color-mix(in srgb, currentColor 12%, transparent);
+  transform: rotate(12deg); background: linear-gradient(130deg, color-mix(in srgb, currentColor 18%, var(--nb-island)), var(--nb-island));
+  box-shadow: -2px 4px 8px color-mix(in srgb, currentColor 14%, transparent);
 }
 .dsh-nb-guide-sheet::before { content: ''; position: absolute; inset: 0 auto 0 4px; width: 1px; background: currentColor; opacity: .45; }
-.dsh-nb-guide-sheet::after { content: ''; position: absolute; left: 10px; top: 13px; width: 16px; height: 10px; background: linear-gradient(currentColor 0 0) 0 0 / 100% 2px, linear-gradient(currentColor 0 0) 0 6px / 65% 1px; background-repeat: no-repeat; opacity: .75; }
-.dsh-nb-art-heading { display: flex; align-items: baseline; gap: 6px; border-top: 1px solid color-mix(in srgb, var(--nb-line) 55%, transparent); padding: 16px 4px 8px; margin-top: 12px; font-size: 12px; font-weight: 520; }
+.dsh-nb-guide-sheet::after { content: ''; position: absolute; left: 9px; top: 12px; width: 14px; height: 10px; background: linear-gradient(currentColor 0 0) 0 0 / 100% 2px, linear-gradient(currentColor 0 0) 0 6px / 65% 1px; background-repeat: no-repeat; opacity: .75; }
+.dsh-nb-art-heading { display: flex; align-items: baseline; gap: 6px; border-top: 1px solid color-mix(in srgb, var(--nb-hairline) 72%, transparent); padding: 13px 3px 7px; margin-top: 10px; font-size: 12px; font-weight: 540; }
 .dsh-nb-art-heading small { font-size: 11px; font-weight: 450; color: var(--nb-muted); font-variant-numeric: tabular-nums; }
 .dsh-nb button.dsh-nb-art {
-  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 8px; margin-bottom: 4px;
-  border-radius: 13px; border: 1px solid transparent; text-align: left;
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 8px; margin-bottom: 3px;
+  border-radius: 12px; border: 1px solid transparent; text-align: left;
+  animation: dsh-nb-materialize 380ms var(--nb-ease-spatial) both;
 }
-.dsh-nb-art .dsh-nb-ico { width: 32px; height: 32px; }
-.dsh-nb-art-open { display: flex; margin-inline-start: auto; flex: none; color: var(--nb-muted); transform: rotate(-90deg); transition: transform 180ms var(--nb-ease), color 180ms var(--nb-ease); }
-.dsh-nb button.dsh-nb-art:hover .dsh-nb-art-open { transform: rotate(-90deg) translateY(2px); color: var(--nb-accent); }
-.dsh-nb-art-copy { min-width: 0; display: grid; gap: 2px; }
-.dsh-nb-art-copy strong { font-size: 13px; font-weight: 450; overflow-wrap: anywhere; }
+.dsh-nb-art .dsh-nb-ico { width: 28px; height: 28px; }
+.dsh-nb-art-open { display: flex; margin-inline-start: auto; flex: none; color: var(--nb-muted); transform: rotate(-90deg); transition: transform 220ms var(--nb-ease-spatial), color 180ms ease; }
+.dsh-nb button.dsh-nb-art:hover .dsh-nb-art-open { transform: rotate(-90deg) translateY(2.5px); color: var(--nb-accent); }
+.dsh-nb-art-copy { min-width: 0; display: grid; gap: 1.5px; }
+.dsh-nb-art-copy strong { font-size: 12.5px; font-weight: 480; overflow-wrap: anywhere; }
 .dsh-nb-art-copy small { font-size: 11px; color: var(--nb-muted); }
-@container studio (max-width: 207px) {
-  .dsh-nb-studio-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container studio (max-width: 196px) {
+  .dsh-nb-studio-grid { grid-template-columns: minmax(0, 1fr); }
 }
-@container studio (min-width: 510px) {
-  .dsh-nb-studio-grid { grid-template-columns: minmax(148px, 1.7fr) repeat(3, minmax(0, 1fr)); gap: 8px; }
+@container studio (min-width: 520px) {
+  .dsh-nb-studio-grid { grid-template-columns: minmax(160px, 1.5fr) repeat(3, minmax(0, 1fr)); gap: 8px; }
   .dsh-nb button.dsh-nb-guide-card { grid-area: 1 / 1 / span 2 / span 1; justify-content: flex-end; padding: 15px; margin: 0; }
-  .dsh-nb-guide-art { right: 8px; top: 7px; translate: 0; transform: scale(1.2); transform-origin: right top; }
+  .dsh-nb-guide-art { right: 8px; top: 8px; translate: 0; transform: scale(1.12); transform-origin: right top; }
 }
 @media (hover: hover) {
   .dsh-nb .dsh-nb-card:not(.dsh-nb-guide-card):hover:not(:disabled) {
-    background: color-mix(in srgb, var(--studio-ink) 10%, var(--nb-panel));
+    background: color-mix(in srgb, var(--studio-ink) 11%, var(--nb-island));
     border-color: color-mix(in srgb, var(--studio-ink) 32%, transparent);
-    transform: translateY(-1.5px);
+    transform: translateY(-2px);
   }
   .dsh-nb button.dsh-nb-art:hover {
-    background: color-mix(in srgb, var(--studio-ink) 8%, transparent);
+    background: var(--nb-tile);
     border-color: color-mix(in srgb, var(--studio-ink) 20%, transparent);
   }
-  .dsh-nb .dsh-nb-guide-card:hover:not(:disabled) { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--studio-ink) 45%, transparent), 0 8px 22px -12px color-mix(in srgb, var(--studio-ink) 35%, transparent); }
+  .dsh-nb .dsh-nb-guide-card:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--studio-ink) 45%, transparent);
+    box-shadow: 0 8px 22px -12px color-mix(in srgb, var(--studio-ink) 35%, transparent);
+    transform: translateY(-1.5px);
+  }
 }
 @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
-  .dsh-nb[data-motion=enabled] .dsh-nb-ico, .dsh-nb[data-motion=enabled] .dsh-nb-guide-sheet { transition: transform 360ms cubic-bezier(.2,.92,.24,1.22); }
+  .dsh-nb[data-motion=enabled] .dsh-nb-ico, .dsh-nb[data-motion=enabled] .dsh-nb-guide-sheet { transition: transform 380ms var(--nb-spring); }
   @media (hover: hover) {
-    .dsh-nb[data-motion=enabled] .dsh-nb-card:hover:not(:disabled) .dsh-nb-ico { transform: translateY(-2px) rotate(-4deg); }
-    .dsh-nb[data-motion=enabled] .dsh-nb-guide-card:hover:not(:disabled) .dsh-nb-guide-sheet { transform: translate(2px,-2px) rotate(17deg); }
+    .dsh-nb[data-motion=enabled] .dsh-nb-card:hover:not(:disabled) .dsh-nb-ico { transform: scale(1.1) rotate(-5deg); }
+    .dsh-nb[data-motion=enabled] .dsh-nb-guide-card:hover:not(:disabled) .dsh-nb-guide-sheet { transform: translate(3px, -3px) rotate(18deg) scale(1.04); }
   }
-  .dsh-nb[data-motion=enabled] .dsh-nb-card:active:not(:disabled) .dsh-nb-ico { transform: scale(.91); transition-duration: 95ms; }
-  .dsh-nb[data-motion=enabled] .dsh-nb-guide-card:active:not(:disabled) .dsh-nb-guide-sheet { transform: translate(-1px,1px) rotate(9deg) scale(.95); transition-duration: 95ms; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-card:active:not(:disabled) .dsh-nb-ico { transform: scale(.9); transition-duration: 90ms; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-card[aria-busy=true] {
+    border-color: color-mix(in srgb, var(--studio-ink) 55%, transparent);
+    box-shadow: 0 4px 16px -6px color-mix(in srgb, var(--studio-ink) 40%, transparent);
+  }
   .dsh-nb[data-motion=enabled] .dsh-nb-card[aria-busy=true]::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(110deg, transparent 25%, color-mix(in srgb, var(--studio-ink) 22%, white 18%) 50%, transparent 75%);
-    transform: translateX(-100%);
-    animation: dsh-nb-shimmer 1.6s ease-in-out infinite;
+    background: linear-gradient(112deg, transparent 18%, color-mix(in srgb, var(--studio-ink) 28%, white 22%) 50%, transparent 82%);
+    transform: translateX(-115%);
+    animation: dsh-nb-shimmer 1.25s var(--nb-ease-spatial) infinite;
   }
-  @keyframes dsh-nb-shimmer { 100% { transform: translateX(100%); } }
+  @keyframes dsh-nb-shimmer { 100% { transform: translateX(115%); } }
 }
 @media (forced-colors: active) {
   .dsh-nb .dsh-nb-ico, .dsh-nb .dsh-nb-guide-sheet, .dsh-nb .dsh-nb-guide-art::before { border: 1px solid ButtonText; color: ButtonText; }
 }
-.dsh-nb-field { width: 100%; min-width: 0; min-height: 36px; border: 1px solid color-mix(in srgb, var(--nb-line) 75%, transparent); border-radius: 11px; padding: 8px 12px; background: color-mix(in srgb, var(--nb-bg) 75%, transparent); }
-.dsh-nb-field:focus { border-color: color-mix(in srgb, var(--nb-accent) 60%, transparent); outline: none; }
-.dsh-nb-area { min-height: 150px; resize: vertical; line-height: 1.7; }
-.dsh-nb-form { display: grid; gap: 14px; }
-.dsh-nb-form label { display: grid; gap: 7px; font-size: 12px; }
+
+/* Forms, Lightweight Transient Dialogs & Study Practice Choreography */
+.dsh-nb-field { width: 100%; min-width: 0; min-height: 36px; border: 1px solid var(--nb-hairline); border-radius: 11px; padding: 8px 12px; background: var(--nb-tile); }
+.dsh-nb-field:focus { border-color: color-mix(in srgb, var(--nb-accent) 62%, transparent); background: var(--nb-island); outline: none; }
+.dsh-nb-area { min-height: 140px; resize: vertical; line-height: 1.7; }
+.dsh-nb-form { display: grid; gap: 13px; }
+.dsh-nb-form label { display: grid; gap: 6px; font-size: 12px; }
 .dsh-nb-form-actions, .dsh-nb-source-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.dsh-nb-source-tools .dsh-nb-field { flex: 1; min-width: 130px; }
-.dsh-nb-tabs { justify-self: start; background: var(--nb-bg); }
+.dsh-nb-source-tools .dsh-nb-field { flex: 1; min-width: 120px; }
+.dsh-nb-tabs { justify-self: start; }
 .dsh-nb-tabs button { padding: 6px 12px; font-size: 12px; }
 .dsh-nb-menu { display: grid; gap: 5px; }
 .dsh-nb-menu .dsh-nb-quiet { justify-content: flex-start; padding: 10px 12px; border-radius: 12px; width: 100%; }
-.dsh-nb-dialog { position: fixed; inset: 72px 18px auto auto; margin: 0; width: min(520px, calc(100vw - 36px)); max-height: calc(100dvh - 100px); padding: 22px; border: 0; border-radius: 20px; box-shadow: var(--dsw-elevation-panel, 0 0 0 .5px var(--nb-line), 0 18px 48px #0004); background: var(--nb-panel); color: var(--nb-fg); font: inherit; overflow: auto; animation: dsh-nb-dialog-in 220ms var(--nb-ease) both; }
-@keyframes dsh-nb-dialog-in { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
-.dsh-nb-dialog::backdrop { background: rgba(8, 12, 20, .34); backdrop-filter: blur(4px); }
-.dsh-nb-dialog-head { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--nb-glass-edge, var(--nb-line)); }
-.dsh-nb-dialog-head h3 { font-size: 16px; font-weight: 540; letter-spacing: -.01em; overflow-wrap: anywhere; min-width: 0; }
+.dsh-nb-dialog {
+  position: fixed; inset: 0; margin: auto; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 64px);
+  padding: 20px 22px; border: 1px solid var(--nb-hairline); border-radius: 22px;
+  box-shadow: var(--dsw-elevation-panel, 0 22px 54px -12px rgba(0, 0, 0, .38));
+  background: var(--nb-island); color: var(--nb-fg); font: inherit; overflow: auto;
+  animation: dsh-nb-dialog-in 340ms var(--nb-ease-spatial) both;
+}
+@keyframes dsh-nb-dialog-in {
+  from { opacity: 0; transform: translateY(14px) scale(.965); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+.dsh-nb-dialog::backdrop { background: rgba(8, 12, 20, .32); backdrop-filter: blur(4px); }
+.dsh-nb-dialog-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding-bottom: 11px; border-bottom: 1px solid var(--nb-hairline); }
+.dsh-nb-dialog-head h3 { font-size: 15.5px; font-weight: 560; letter-spacing: -.01em; overflow-wrap: anywhere; min-width: 0; }
 .dsh-nb-dialog-head .dsh-nb-icon-button { margin-left: auto; }
 .dsh-nb-dialog .dsh-nb-status { margin: 0 0 14px; }
-.dsh-nb-source-detail { display: grid; gap: 14px; }
-.dsh-nb-preview, .dsh-nb-source-body { font-size: var(--dsh-content-font-size, 14px); font-family: inherit; line-height: calc(25px + var(--dsh-content-font-delta, 0px)); white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
-.dsh-nb-study { display: grid; gap: 14px; min-width: 0; }
-.dsh-nb-study progress { width: 100%; height: 6px; border-radius: 999px; overflow: hidden; border: 0; background: color-mix(in srgb, var(--nb-soft) 80%, transparent); accent-color: var(--nb-accent); }
-.dsh-nb-study progress::-webkit-progress-bar { background: color-mix(in srgb, var(--nb-soft) 80%, transparent); border-radius: 999px; }
-.dsh-nb-study progress::-webkit-progress-value { background: linear-gradient(90deg, var(--nb-accent), var(--nb-glass-cyan, var(--nb-accent))); border-radius: 999px; transition: width 300ms var(--nb-ease); }
-.dsh-nb-study-summary { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--nb-glass-edge, var(--nb-line)); border-radius: 14px; background: color-mix(in srgb, var(--nb-bg) 65%, transparent); }
-.dsh-nb-study-question { margin: 0; font-size: 15px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 500; }
-.dsh-nb-study-choices { display: grid; gap: 8px; }
-.dsh-nb button.dsh-nb-study-choice { width: 100%; display: flex; gap: 10px; text-align: left; padding: 11px 13px; border: 1px solid color-mix(in srgb, var(--nb-line) 75%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--nb-bg) 65%, transparent); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.dsh-nb button.dsh-nb-study-choice:hover:not(:disabled) { border-color: color-mix(in srgb, var(--nb-accent) 45%, transparent); background: color-mix(in srgb, var(--nb-accent) 6%, var(--nb-bg)); transform: translateY(-1px); }
-.dsh-nb-study-choice .dsh-nb-study-letter { color: var(--nb-muted); flex: none; font-weight: 550; }
-.dsh-nb button.dsh-nb-study-choice.is-selected { border-color: var(--nb-accent); background: var(--nb-accent-soft); }
+.dsh-nb-inpane .dsh-nb-status { margin: 0; flex-direction: column; align-items: flex-start; }
+.dsh-nb-source-detail { display: grid; gap: 12px; }
+.dsh-nb-preview, .dsh-nb-source-body { font-size: var(--dsh-content-font-size, 13.5px); font-family: inherit; line-height: calc(24px + var(--dsh-content-font-delta, 0px)); white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.dsh-nb-study { display: grid; gap: 12px; min-width: 0; }
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .dsh-nb-study[data-study-item] { animation: dsh-nb-study-card 380ms var(--nb-ease-spatial) both; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-study-feedback { transform-origin: top center; animation: dsh-nb-flip-unfold 420ms var(--nb-ease-spatial) both; }
+}
+@keyframes dsh-nb-study-card {
+  0% { opacity: 0; transform: translateX(18px) scale(.985); filter: blur(3.5px); }
+  35% { filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes dsh-nb-flip-unfold {
+  0% { opacity: 0; transform: perspective(800px) rotateX(-8deg) translateY(8px); filter: blur(2.5px); }
+  30% { filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: blur(0); }
+}
+.dsh-nb-study progress { width: 100%; height: 6px; border-radius: 999px; overflow: hidden; border: 0; background: color-mix(in srgb, var(--nb-line) 75%, transparent); accent-color: var(--nb-accent); }
+.dsh-nb-study progress::-webkit-progress-bar { background: color-mix(in srgb, var(--nb-line) 75%, transparent); border-radius: 999px; }
+.dsh-nb-study progress::-webkit-progress-value { background: linear-gradient(90deg, var(--nb-accent), var(--nb-aurora-sky)); border-radius: 999px; transition: width 420ms var(--nb-ease-spatial); }
+.dsh-nb-study-summary { display: grid; gap: 8px; padding: 12px 13px; border: 1px solid var(--nb-hairline); border-radius: 14px; background: var(--nb-tile); }
+.dsh-nb-study-question { margin: 0; font-size: 14px; line-height: 1.68; white-space: pre-wrap; overflow-wrap: anywhere; font-weight: 540; }
+.dsh-nb-study-question:focus { outline: none; }
+.dsh-nb-study-choices { display: grid; gap: 7px; }
+.dsh-nb button.dsh-nb-study-choice {
+  width: 100%; display: flex; gap: 9px; text-align: left; padding: 10px 12px;
+  border: 1px solid var(--nb-hairline); border-radius: 12px; background: var(--nb-tile);
+  font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.dsh-nb button.dsh-nb-study-choice:hover:not(:disabled) { border-color: color-mix(in srgb, var(--nb-accent) 48%, transparent); background: var(--nb-tile-hover); transform: translateY(-1px); }
+.dsh-nb-study-choice .dsh-nb-study-letter { color: var(--nb-muted); flex: none; font-weight: 600; }
+.dsh-nb button.dsh-nb-study-choice.is-selected { border-color: var(--nb-accent); background: color-mix(in srgb, var(--nb-accent) 11%, var(--nb-island)); }
+.dsh-nb button.dsh-nb-study-choice.is-selected .dsh-nb-study-letter { color: var(--nb-accent-ink); }
 .dsh-nb button.dsh-nb-study-choice.is-correct { border-color: var(--nb-accent); }
 .dsh-nb button.dsh-nb-study-choice.is-wrong { border-color: var(--nb-danger); }
-.dsh-nb-study-feedback { display: grid; gap: 10px; border-left: 3px solid var(--nb-accent); padding: 13px 14px; border-radius: 0 12px 12px 0; background: color-mix(in srgb, var(--nb-bg) 72%, transparent); }
+.dsh-nb-study-feedback { display: grid; gap: 9px; border-left: 3px solid var(--nb-accent); padding: 11px 13px; border-radius: 0 12px 12px 0; background: var(--nb-tile); font-size: 13px; }
 .dsh-nb-study-feedback.is-incorrect { border-color: var(--nb-danger); }
-.dsh-nb-study-feedback p { white-space: pre-wrap; overflow-wrap: anywhere; }
-.dsh-nb-study-recall { min-height: 90px; resize: vertical; }
-.dsh-nb-study-history { border-top: 1px solid color-mix(in srgb, var(--nb-line) 60%, transparent); padding-top: 12px; }
-.dsh-nb-study-history summary { cursor: pointer; font-size: 13px; }
-.dsh-nb-study-history-list { display: grid; gap: 14px; list-style: none; padding: 0; margin: 14px 0 0; }
-.dsh-nb-study-history-list li { display: grid; gap: 7px; padding-bottom: 14px; border-bottom: 1px solid color-mix(in srgb, var(--nb-line) 55%, transparent); }
-.dsh-nb-study-history-list p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
-.dsh-nb-scroll, .dsh-nb-thread, .dsh-nb-studio, .dsh-nb-dialog { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--nb-line) 80%, transparent) transparent; }
-@media (forced-colors: none) and (prefers-reduced-transparency: no-preference) {
-  .dsh-nb-col.is-sources, .dsh-nb-col.is-studio {
-    background: linear-gradient(155deg, color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 6%, transparent), transparent 36%), color-mix(in srgb, var(--nb-panel) 54%, transparent);
-    box-shadow: inset 0 1px 0 var(--nb-glass-highlight, transparent), 0 10px 30px -18px color-mix(in srgb, var(--nb-fg) 22%, transparent);
-    backdrop-filter: blur(18px) saturate(1.15); -webkit-backdrop-filter: blur(18px) saturate(1.15);
-  }
-  .dsh-nb-message.user {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--nb-accent) 11%, var(--nb-panel)), color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 6%, var(--nb-panel)));
-    box-shadow: inset 0 1px 0 var(--nb-glass-highlight, transparent), inset 0 0 0 1px var(--nb-glass-edge, var(--nb-line));
-  }
-  .dsh-nb-dialog { background: linear-gradient(135deg, color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 7%, transparent), transparent 38%), var(--nb-panel); border: 1px solid var(--nb-glass-edge, var(--nb-line)); }
-  @supports (backdrop-filter: blur(1px)) {
-    .dsh-nb-dialog { background-color: color-mix(in srgb, var(--nb-panel) 84%, transparent); backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2); }
-  }
-  /* Soft ambient halo and breathing water ripples beneath the particle whale. */
-  .dsh-nb-hero-mark::before, .dsh-nb-hero-mark::after {
-    content: ''; position: absolute; z-index: -1; pointer-events: none; left: 50%; bottom: 0; border-radius: 50%;
-    border: 1px solid color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 46%, transparent);
-    mask-image: linear-gradient(106deg, transparent, #000 30%, #0009 64%, transparent 98%);
-  }
-  .dsh-nb-hero-mark::before { width: 84%; height: 24%; transform: translateX(-50%) rotate(-4deg); }
-  .dsh-nb-hero-mark::after { width: 58%; height: 14%; bottom: 4%; transform: translateX(-47%) rotate(-4deg); background: radial-gradient(ellipse, color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 18%, transparent), transparent 72%); }
-  .dsh-nb[data-motion=enabled] .dsh-nb-hero-mark::before { animation: dsh-nb-ripple 5.4s ease-in-out infinite; }
-  .dsh-nb[data-motion=enabled] .dsh-nb-hero-mark::after { animation: dsh-nb-ripple 5.4s ease-in-out infinite reverse; }
-  @keyframes dsh-nb-ripple {
-    0%, 100% { opacity: .68; transform: translateX(-50%) rotate(-4deg) scale(1); }
-    50% { opacity: 1; transform: translateX(-49%) rotate(-3.5deg) scale(1.035); }
-  }
-}
-@media (prefers-reduced-motion: no-preference) and (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-  .dsh-nb-dialog-head { position: relative; }
-  .dsh-nb-dialog-head::after {
-    content: ''; position: absolute; pointer-events: none; left: 0; bottom: -1px; width: 38%; height: 1px; opacity: 0;
-    background: linear-gradient(90deg, transparent, var(--nb-glass-cyan), transparent);
-    animation: dsh-nb-edge-reflection 520ms ease-out;
-  }
-  @keyframes dsh-nb-edge-reflection {
-    0% { opacity: 0; transform: translateX(0); }
-    35% { opacity: .85; }
-    100% { opacity: 0; transform: translateX(180%); }
-  }
-  .dsh-nb[data-motion=enabled][data-running=true] .dsh-nb-composer {
-    border-color: color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 55%, var(--nb-line));
-    box-shadow: inset 0 1px var(--nb-glass-highlight), 0 0 22px -6px color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 32%, transparent);
-    animation: dsh-nb-composer-pulse 2.2s ease-in-out infinite;
-  }
-  @keyframes dsh-nb-composer-pulse {
-    0%, 100% { box-shadow: inset 0 1px var(--nb-glass-highlight), 0 0 18px -8px color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 22%, transparent); }
-    50% { box-shadow: inset 0 1px var(--nb-glass-highlight), 0 0 26px -4px color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 42%, transparent); }
-  }
-}
+.dsh-nb-study-feedback p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.dsh-nb-study-recall { min-height: 84px; resize: vertical; }
+.dsh-nb-study-history { border-top: 1px solid var(--nb-hairline); padding-top: 11px; }
+.dsh-nb-study-history-list { display: grid; gap: 12px; list-style: none; padding: 0; margin: 12px 0 0; }
+.dsh-nb-study-history-list li { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--nb-hairline); }
+.dsh-nb-study-history-list p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; }
+.dsh-nb-scroll, .dsh-nb-thread, .dsh-nb-studio, .dsh-nb-inpane-body, .dsh-nb-dialog { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--nb-line) 80%, transparent) transparent; }
+
+/* Responsive Breakpoints */
 @container notebook (max-width: 999px) {
-  .dsh-nb-grid { grid-template-columns: 214px minmax(0, 1fr); }
+  .dsh-nb-grid { grid-template-columns: 224px minmax(0, 1fr); }
+  .dsh-nb[data-source-open=true] .dsh-nb-grid { grid-template-columns: 276px minmax(0, 1fr); }
   .dsh-nb[data-sources-collapsed=true] .dsh-nb-grid { grid-template-columns: 44px minmax(0, 1fr); }
   .dsh-nb .is-studio { display: none; }
-  .dsh-nb-pane-tabs { display: flex; padding-top: 9px; padding-bottom: 0; }
+  .dsh-nb-pane-tabs { display: flex; padding-top: 6px; padding-bottom: 2px; }
   .dsh-nb[data-pane=studio] .is-studio { display: flex; }
   .dsh-nb[data-pane=studio] .is-main { display: none; }
 }
 @container notebook (max-width: 759px) {
-  .dsh-nb-grid { display: flex; }
-  .dsh-nb .dsh-nb-col { display: none; flex: 1; border: 0; box-shadow: none; background: transparent; backdrop-filter: none; }
+  .dsh-nb-grid { display: flex; padding: 4px 10px 10px; }
+  .dsh-nb .dsh-nb-col { display: none; flex: 1; }
   .dsh-nb[data-pane=chat] .is-main, .dsh-nb[data-pane=sources] .is-sources, .dsh-nb[data-pane=studio] .is-studio { display: flex; }
-  .dsh-nb-toolbar { padding: 10px 12px; min-height: 54px; gap: 8px; }
+  .dsh-nb-toolbar { padding: 8px 12px 4px; min-height: 50px; gap: 8px; }
   .dsh-nb-toolbar-brand { display: none; }
   .dsh-nb .dsh-nb-notebook-trigger { font-size: 14px; max-width: 60%; padding-inline: 6px; }
   .dsh-nb-toolbar-controls .dsh-nb-quiet > span { display: none; }
   .dsh-nb-toolbar-controls .dsh-nb-quiet { padding: 6px; }
-  .dsh-nb-head .dsh-nb-collapse { display: none; }
-  .dsh-nb-thread { padding: 0 8px 16px; }
-  .dsh-nb-composer { margin: 0; }
-  .dsh-nb-hero h2 { font-size: 24px; }
-  .dsh-nb-hero { padding: 16px 0 32px; }
-  .dsh-nb-hero-mark { width: 240px; max-width: 100%; height: 112px; }
+  .dsh-nb-head .dsh-nb-collapse, .dsh-nb-inpane-wide { display: none; }
+  .dsh-nb-thread { padding: 12px 14px 14px; }
+  .dsh-nb-composer { margin: 0 10px 6px; }
+  .dsh-nb-composer-hint { padding-inline: 16px; }
+  .dsh-nb-hero h2 { font-size: 23px; }
+  .dsh-nb-hero { padding: 16px 0 28px; }
+  .dsh-nb-hero-mark { width: 232px; max-width: 100%; height: 110px; }
 }
-@media (max-width: 600px) { .dsh-nb-dialog { inset: 24px 12px auto; width: calc(100vw - 24px); max-height: calc(100dvh - 48px); } }
-@media (pointer: coarse) { .dsh-nb .dsh-nb-icon-button { min-width: 40px; min-height: 40px; } .dsh-nb-mode button, .dsh-nb-model-select { min-height: 40px; } .dsh-nb .dsh-nb-source-tools-row { grid-template-columns: 1fr 40px; } .dsh-nb textarea, .dsh-nb input { font-size: 16px; } }
-/* Glass surfaces & optical canvas follow the host palette. */
-.dsh-nb {
-  --nb-glass-cyan: color-mix(in srgb, var(--nb-accent) 46%, #4cd6e0);
-  --nb-accent-ink: color-mix(in srgb, var(--nb-accent) 72%, var(--nb-fg));
-  --nb-glass-edge: color-mix(in srgb, var(--nb-accent) 20%, var(--nb-line));
-  --nb-glass-highlight: color-mix(in srgb, white 22%, transparent);
-  --nb-glass-surface: var(--nb-panel);
-  --nb-input-surface: var(--dsw-specific-input-major, var(--nb-panel));
-  background-image:
-    radial-gradient(circle, color-mix(in srgb, var(--nb-fg) 5.5%, transparent) 1px, transparent 1px),
-    radial-gradient(ellipse 68% 48% at 6% 2%, color-mix(in srgb, var(--nb-accent) 11%, transparent), transparent 62%),
-    radial-gradient(ellipse 62% 52% at 94% 94%, color-mix(in srgb, var(--nb-glass-cyan) 10%, transparent), transparent 64%);
-  background-size: 24px 24px, 100% 100%, 100% 100%;
+@media (pointer: coarse) {
+  .dsh-nb .dsh-nb-icon-button { min-width: 40px; min-height: 40px; }
+  .dsh-nb-mode button, .dsh-nb-model-select { min-height: 40px; }
+  .dsh-nb .dsh-nb-source-tools-row { grid-template-columns: 1fr 1fr 40px; }
+  .dsh-nb textarea, .dsh-nb input { font-size: max(16px, var(--dsh-content-font-size, 14px)); }
 }
-.dsh-nb[data-mode=research] {
-  background-image:
-    radial-gradient(circle, color-mix(in srgb, var(--nb-fg) 5.5%, transparent) 1px, transparent 1px),
-    radial-gradient(ellipse 70% 50% at 8% 4%, color-mix(in srgb, var(--nb-glass-cyan) 12%, transparent), transparent 64%),
-    radial-gradient(ellipse 64% 52% at 92% 92%, color-mix(in srgb, var(--nb-accent) 10%, transparent), transparent 66%);
-}
-.dsh-nb-toolbar {
-  position: relative;
-  background: linear-gradient(102deg, color-mix(in srgb, var(--nb-accent) 6%, transparent), transparent 46%), var(--nb-glass-surface);
-}
-.dsh-nb-toolbar::after {
-  content: ''; position: absolute; inset: auto 0 0; height: 1px; pointer-events: none;
-  background: linear-gradient(90deg, var(--nb-glass-edge), color-mix(in srgb, var(--nb-line) 50%, transparent) 36%, color-mix(in srgb, var(--nb-line) 50%, transparent) 74%, color-mix(in srgb, var(--nb-glass-cyan) 32%, transparent));
-}
-.dsh-nb-toolbar-brand { align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--nb-glass-edge); border-radius: 10px; background: var(--nb-accent-soft); box-shadow: inset 0 1px var(--nb-glass-highlight), 0 0 14px -4px color-mix(in srgb, var(--nb-accent) 32%, transparent); }
-.dsh-nb-toolbar-brand svg { width: 18px; height: 18px; }
-.dsh-nb-composer {
-  position: relative; isolation: isolate; border: 1px solid var(--nb-glass-edge); border-radius: 22px;
-  background-color: var(--nb-input-surface);
-  box-shadow: inset 0 1px var(--nb-glass-highlight), 0 10px 30px -14px color-mix(in srgb, var(--nb-fg) 24%, transparent);
-  transition: border-color 220ms var(--nb-ease), box-shadow 220ms var(--nb-ease);
-}
-.dsh-nb-composer::before {
-  content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; pointer-events: none;
-  background:
-    radial-gradient(ellipse at 88% 112%, color-mix(in srgb, var(--nb-glass-cyan) 16%, transparent), transparent 44%),
-    linear-gradient(115deg, color-mix(in srgb, white 7%, transparent), transparent 34%, color-mix(in srgb, var(--nb-accent) 6%, transparent) 64%, transparent 88%);
-  background-size: 128% 116%; background-position: 50% 50%;
-  transition: background-position 360ms var(--nb-ease);
-}
-.dsh-nb-composer:focus-within {
-  border-color: color-mix(in srgb, var(--nb-accent) 68%, var(--nb-line));
-  box-shadow: inset 0 1px var(--nb-glass-highlight), 0 0 0 2px color-mix(in srgb, var(--nb-accent) 14%, transparent), 0 12px 32px -12px color-mix(in srgb, var(--nb-accent) 26%, transparent);
-}
-.dsh-nb-composer:focus-within::before { background-position: 86% 100%; }
-.dsh-nb-composer textarea { font-size: var(--dsh-content-font-size, 14px); line-height: calc(24px + var(--dsh-content-font-delta, 0px)); }
-.dsh-nb-composer textarea::placeholder { color: var(--nb-muted); opacity: .88; }
-.dsh-nb-mode { background: color-mix(in srgb, var(--nb-bg) 55%, transparent); }
-.dsh-nb-composer-trailing { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-left: auto; min-width: 0; max-width: 100%; }
-.dsh-nb-composer .dsh-nb-model { flex: 0 1 auto; max-width: min(210px, 36cqi); }
-@container notebook (max-width: 380px) { .dsh-nb-composer .dsh-nb-model { max-width: 24cqi; } }
-.dsh-nb button.dsh-nb-send, .dsh-nb button.dsh-nb-stop { flex: none; margin-left: 0; border-radius: 999px; }
-.dsh-nb button.dsh-nb-send {
-  width: 34px; height: 34px; color: white;
-  background: linear-gradient(135deg, var(--dsw-alias-button-info-fill, #4169c9), color-mix(in srgb, var(--dsw-alias-button-info-fill, #4169c9) 72%, var(--nb-glass-cyan, #4cd6e0)));
-  box-shadow: inset 0 1px var(--nb-glass-highlight), 0 4px 12px -3px color-mix(in srgb, var(--dsw-alias-button-info-fill, #4169c9) 55%, transparent);
-}
-.dsh-nb button.dsh-nb-send:disabled { background: color-mix(in srgb, var(--nb-soft) 70%, transparent); color: var(--nb-muted); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nb-line) 75%, transparent); }
-.dsh-nb button.dsh-nb-chip.primary {
-  color: var(--nb-accent-ink); border-color: var(--nb-glass-edge);
-  background: linear-gradient(120deg, color-mix(in srgb, var(--nb-accent) 15%, transparent), color-mix(in srgb, var(--nb-glass-cyan) 9%, transparent));
-  box-shadow: inset 0 1px var(--nb-glass-highlight);
-}
-.dsh-nb-mode button.on, .dsh-nb-pane-tabs button[aria-pressed=true], .dsh-nb-tabs button.on,
-.dsh-nb button.dsh-nb-citation, .dsh-nb-research li button, .dsh-nb-research-heading strong { color: var(--nb-accent-ink); }
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-    .dsh-nb {
-      --nb-glass-surface: color-mix(in srgb, var(--nb-panel) 62%, transparent);
-      --nb-input-surface: color-mix(in srgb, var(--dsw-specific-input-major, var(--nb-panel)) 74%, transparent);
-    }
-    .dsh-nb-toolbar, .dsh-nb-composer { -webkit-backdrop-filter: blur(14px) saturate(1.15); backdrop-filter: blur(14px) saturate(1.15); }
-  }
-}
-@media (hover: hover) {
-  .dsh-nb-composer:hover:not(:focus-within)::before { background-position: 72% 85%; }
-  .dsh-nb button.dsh-nb-send:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.08); }
-  .dsh-nb button.dsh-nb-send:not(:disabled):active { transform: scale(.94); }
-}
-@media (pointer: coarse) { .dsh-nb-composer textarea { font-size: max(16px, var(--dsh-content-font-size, 14px)); } }
-@media (forced-colors: active), (prefers-reduced-transparency: reduce) {
-  .dsh-nb { background-image: none !important; }
-  .dsh-nb-toolbar { background: var(--nb-panel); border-bottom: 1px solid var(--nb-line); }
-  .dsh-nb-toolbar::after, .dsh-nb-composer::before { display: none; }
-  .dsh-nb button.dsh-nb-chip.primary { background: var(--nb-panel); }
-}
-@media (forced-colors: active) {
-  .dsh-nb-composer { background: Canvas; border-color: ButtonText; box-shadow: none; }
-  .dsh-nb-composer:focus-within { outline: 2px solid Highlight; }
-  .dsh-nb-switch-track { display: none; }
-  .dsh-nb-mode button.on, .dsh-nb-tabs button.on, .dsh-nb-pane-tabs button[aria-pressed=true] { outline: 2px solid Highlight; outline-offset: -2px; }
-}
-/* End glass surfaces. */
 @media (prefers-reduced-motion: no-preference) {
   @container notebook (max-width: 999px) {
     .dsh-nb[data-motion=enabled][data-pane-direction][data-pane=chat] .is-main,
-    .dsh-nb[data-motion=enabled][data-pane-direction][data-pane=studio] .is-studio { animation: dsh-nb-pane-in 270ms cubic-bezier(.18,.82,.29,1) both; }
+    .dsh-nb[data-motion=enabled][data-pane-direction][data-pane=studio] .is-studio { animation: dsh-nb-pane-in 320ms var(--nb-ease-spatial) both; }
   }
   @container notebook (max-width: 759px) {
-    .dsh-nb[data-motion=enabled][data-pane-direction][data-pane=sources] .is-sources { animation: dsh-nb-pane-in 270ms cubic-bezier(.18,.82,.29,1) both; }
+    .dsh-nb[data-motion=enabled][data-pane-direction][data-pane=sources] .is-sources { animation: dsh-nb-pane-in 320ms var(--nb-ease-spatial) both; }
   }
 }
-.dsh-nb[data-pane-direction=back] { --nb-pane-offset: -8px; }
-@keyframes dsh-nb-pane-in { from { opacity: .78; transform: translateX(var(--nb-pane-offset, 8px)); } to { opacity: 1; transform: none; } }
+.dsh-nb[data-pane-direction=back] { --nb-pane-offset: -12px; }
+@keyframes dsh-nb-pane-in { from { opacity: .68; transform: translateX(var(--nb-pane-offset, 12px)); filter: blur(3px); } to { opacity: 1; transform: none; filter: blur(0); } }
+
+/* Grouped Model Picker */
 .dsh-nb .dsh-nb-model-select {
   display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-width: 0;
   min-height: 32px; padding: 4px 10px; border: 1px solid transparent; border-radius: 999px;
@@ -647,24 +813,24 @@ window.__ModuleLoader__.load({
 }
 .dsh-nb-model-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-nb-model-mark { display: inline-flex; flex: none; color: var(--nb-accent); }
-.dsh-nb-model-chevron { display: inline-flex; flex: none; margin-left: auto; color: var(--nb-muted); transition: transform 260ms cubic-bezier(.2,.8,.2,1); }
+.dsh-nb-model-chevron { display: inline-flex; flex: none; margin-left: auto; color: var(--nb-muted); transition: transform 280ms var(--nb-ease-spatial); }
 .dsh-nb-model-select[aria-expanded=true] .dsh-nb-model-chevron { transform: rotate(180deg); }
 .dsh-nb .dsh-nb-model-select:is(:hover:not(:disabled), [aria-expanded=true]) { background: var(--nb-accent-soft); }
 .dsh-nb .dsh-nb-model-select:focus-visible { outline-offset: 1px; }
-.dsh-nb select.dsh-nb-model-select { width: 100%; background-color: var(--nb-panel); }
+.dsh-nb select.dsh-nb-model-select { width: 100%; background-color: var(--nb-island); }
 .dsh-nb-model-field { display: grid; gap: 7px; min-width: 0; font-size: 12px; }
-.dsh-nb-model-field .dsh-nb-model-select { width: 100%; min-height: 38px; padding-inline: 11px; border-color: var(--nb-line); border-radius: 11px; background: var(--nb-bg); }
+.dsh-nb-model-field .dsh-nb-model-select { width: 100%; min-height: 38px; padding-inline: 11px; border-color: var(--nb-hairline); border-radius: 11px; background: var(--nb-tile); }
 .dsh-nb-model-list {
   position: fixed; inset: auto; z-index: 2; margin: 0; padding: 8px; box-sizing: border-box;
   min-width: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin;
-  border: 1px solid var(--nb-glass-edge); border-radius: 18px; color: var(--nb-fg);
-  background: var(--nb-panel); box-shadow: 0 14px 34px -8px #0814263d, inset 0 1px 0 var(--nb-glass-highlight);
+  border: 1px solid var(--nb-hairline); border-radius: 18px; color: var(--nb-fg);
+  background: var(--nb-island); box-shadow: 0 16px 38px -8px rgba(8, 20, 38, .26);
   text-align: start; font: inherit; transform-origin: 84% 0%; pointer-events: none;
 }
 .dsh-nb-model-list:popover-open { pointer-events: auto; }
 .dsh-nb-model-list[data-side=above] { transform-origin: 84% 100%; }
-.dsh-nb-model-list [role=group] + [role=group] { border-top: 1px solid color-mix(in srgb, var(--nb-line) 65%, transparent); margin-top: 5px; padding-top: 5px; }
-.dsh-nb-model-provider { padding: 5px 10px 3px; color: var(--nb-muted); font-size: 11px; font-weight: 450; line-height: 1.5; overflow-wrap: anywhere; }
+.dsh-nb-model-list [role=group] + [role=group] { border-top: 1px solid var(--nb-hairline); margin-top: 5px; padding-top: 5px; }
+.dsh-nb-model-provider { padding: 5px 10px 3px; color: var(--nb-muted); font-size: 11px; font-weight: 480; line-height: 1.5; overflow-wrap: anywhere; }
 .dsh-nb button.dsh-nb-model-option {
   display: grid; grid-template-columns: minmax(0, 1fr) 16px; width: 100%; min-height: 35px; align-items: center;
   gap: 10px; padding: 7px 10px; border-radius: 10px; color: var(--nb-fg); font-size: 13px;
@@ -672,48 +838,61 @@ window.__ModuleLoader__.load({
 }
 .dsh-nb-model-option[aria-selected=true] { background: var(--nb-accent-soft); font-weight: 550; }
 .dsh-nb-model-option svg { color: var(--nb-accent); }
-.dsh-nb button.dsh-nb-model-option:hover { background-color: color-mix(in srgb, var(--nb-soft) 70%, var(--nb-accent-soft)); }
+.dsh-nb button.dsh-nb-model-option:hover { background-color: var(--nb-tile-hover); }
 .dsh-nb button.dsh-nb-model-option:focus-visible { outline: 1px solid var(--nb-accent); outline-offset: -2px; }
 @media (pointer: coarse) { .dsh-nb .dsh-nb-model-select, .dsh-nb button.dsh-nb-model-option { min-height: 40px; } }
 @container notebook (max-width: 420px) { .dsh-nb-composer .dsh-nb-model-mark { display: none; } .dsh-nb-composer .dsh-nb-model-select { gap: 3px; padding-inline: 5px; } }
 @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
   @supports (backdrop-filter: blur(1px)) {
     .dsh-nb-model-list {
-      background: linear-gradient(130deg, color-mix(in srgb, var(--nb-accent) 6%, transparent), transparent 70%), color-mix(in srgb, var(--nb-panel) 92%, transparent);
-      backdrop-filter: blur(16px);
+      background: color-mix(in srgb, var(--nb-island) 90%, transparent);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     }
   }
 }
 @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
   .dsh-nb-model-list {
-    --nb-menu-travel: -6px; opacity: 0; transform: translateY(var(--nb-menu-travel)) scale(.975);
-    transition: opacity 110ms ease-in, transform 130ms ease-in, display 130ms allow-discrete, overlay 130ms allow-discrete;
+    --nb-menu-travel: -8px; opacity: 0; transform: translateY(var(--nb-menu-travel)) scale(.965); filter: blur(3px);
+    transition: opacity 130ms ease-in, transform 150ms var(--nb-ease-exit), filter 130ms ease-in, display 150ms allow-discrete, overlay 150ms allow-discrete;
   }
-  .dsh-nb-model-list[data-side=above] { --nb-menu-travel: 6px; }
+  .dsh-nb-model-list[data-side=above] { --nb-menu-travel: 8px; }
   .dsh-nb-model-list:popover-open {
-    opacity: 1; transform: none;
-    transition: opacity 120ms ease-out, transform 320ms linear(0,.23 12%,.66 27%,.95 45%,1.022 63%,1.014 78%,1);
+    opacity: 1; transform: none; filter: blur(0);
+    transition: opacity 160ms ease-out, filter 220ms var(--nb-ease-spatial), transform 360ms var(--nb-spring);
   }
-  @starting-style { .dsh-nb-model-list:popover-open { opacity: 0; transform: translateY(var(--nb-menu-travel)) scale(.965); } }
-}
-@media (forced-colors: active) {
-  .dsh-nb-model-list { border-color: ButtonText; background: Canvas; box-shadow: none; }
-  .dsh-nb button.dsh-nb-model-option[aria-selected=true] { border: 1px solid Highlight; }
+  @starting-style { .dsh-nb-model-list:popover-open { opacity: 0; transform: translateY(var(--nb-menu-travel)) scale(.955); filter: blur(4px); } }
 }
 
-@keyframes dsh-nb-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-@media (hover: hover) { .dsh-nb button { transition: background-color 150ms var(--nb-ease), color 150ms var(--nb-ease), border-color 150ms var(--nb-ease), transform 150ms var(--nb-ease), box-shadow 180ms var(--nb-ease), filter 150ms var(--nb-ease); } }
-@media (prefers-color-scheme: light) {
-  .dsh-nb {
-    --nb-fallback-bg: #f6f8fc; --nb-fallback-panel: #ffffff; --nb-fallback-soft: #ebf0f7;
-    --nb-fallback-fg: #1c2230; --nb-fallback-muted: #647087; --nb-fallback-line: #d8e0ec;
-    --nb-fallback-accent: #3867d6; --nb-fallback-danger: #c03945;
-    --nb-glass-highlight: color-mix(in srgb, white 65%, transparent);
+/* Accessibility & Reduced Transparency / Motion / Forced-Colors Guardrails */
+@keyframes dsh-nb-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (hover: hover) {
+  .dsh-nb button { transition: background-color 170ms var(--nb-ease), color 170ms var(--nb-ease), border-color 170ms var(--nb-ease), transform 200ms var(--nb-ease-spatial), box-shadow 200ms var(--nb-ease), filter 170ms var(--nb-ease); }
+}
+@media (forced-colors: active), (prefers-reduced-transparency: reduce) {
+  .dsh-nb { background-image: none !important; }
+  .dsh-nb-toolbar, .dsh-nb-composer, .dsh-nb-col, .dsh-nb-inpane, .dsh-nb-dialog, .dsh-nb-model-list {
+    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
   }
+  .dsh-nb-toolbar { background-color: var(--nb-canvas); border-bottom: 1px solid var(--nb-line); }
+  .dsh-nb-composer { background-color: var(--nb-island); }
+  .dsh-nb-composer::after { display: none !important; }
+  .dsh-nb button.dsh-nb-chip.primary { background: var(--nb-island); }
 }
 @media (prefers-reduced-motion: reduce) { .dsh-nb *, .dsh-nb *::before, .dsh-nb *::after { animation: none !important; transition: none !important; } }
 .dsh-nb[data-motion=static] *, .dsh-nb[data-motion=static] *::before, .dsh-nb[data-motion=static] *::after { animation: none !important; transition: none !important; }
-@media (forced-colors: active) { .dsh-nb { --nb-bg: Canvas; --nb-panel: Canvas; --nb-soft: Canvas; --nb-fg: CanvasText; --nb-muted: CanvasText; --nb-line: ButtonText; --nb-accent: LinkText; } .dsh-nb-activity { color: CanvasText; animation: none; } .dsh-nb button, .dsh-nb select, .dsh-nb textarea, .dsh-nb-dialog { border: 1px solid ButtonText; } }
+@media (forced-colors: active) {
+  .dsh-nb {
+    --nb-bg: Canvas; --nb-panel: Canvas; --nb-soft: Canvas; --nb-canvas: Canvas; --nb-island: Canvas; --nb-tile: Canvas;
+    --nb-fg: CanvasText; --nb-muted: CanvasText; --nb-line: ButtonText; --nb-hairline: ButtonText; --nb-accent: LinkText; --nb-accent-ink: LinkText;
+  }
+  .dsh-nb-activity { color: CanvasText; animation: none; }
+  .dsh-nb button, .dsh-nb select, .dsh-nb textarea, .dsh-nb-dialog, .dsh-nb-col, .dsh-nb-inpane { border: 1px solid ButtonText; }
+  .dsh-nb-composer { background: Canvas; border-color: ButtonText; box-shadow: none; }
+  .dsh-nb-composer:focus-within { outline: 2px solid Highlight; }
+  .dsh-nb-switch-track { display: none; }
+  .dsh-nb-mode button.on, .dsh-nb-tabs button.on, .dsh-nb-pane-tabs button[aria-pressed=true], .dsh-nb button.dsh-nb-model-option[aria-selected=true] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .dsh-nb-model-list { border-color: ButtonText; background: Canvas; box-shadow: none; }
+}
 `
     function ensureStyles() {
       let tag = document.getElementById('dsh-notebook-style')
@@ -837,12 +1016,13 @@ window.__ModuleLoader__.load({
     function UiIcon({ kind, size = 16 }) {
       const paths = {
         model: 'm8 2.2 5.7 3.15L8 8.55 2.3 5.35zm-5.5 6.1L8 11.4l5.5-3.1M2.5 11.1 8 14.2l5.5-3.1', check: 'm3.1 8 3.15 3.2 6.6-6.5',
-        plus: 'M8 3v10M3 8h10', chevron: 'm4 6 4 4 4-4', more: 'M3 8h.01M8 8h.01M13 8h.01', close: 'm4 4 8 8M12 4l-8 8',
+        plus: 'M8 3v10M3 8h10', chevron: 'm4 6 4 4 4-4', back: 'M10.2 3.5 5.8 8l4.4 4.5', more: 'M3 8h.01M8 8h.01M13 8h.01', close: 'm4 4 8 8M12 4l-8 8',
         history: 'M3 5a5.4 5.4 0 1 1-.3 5M2 2v4h4M8 4v4l3 2', send: 'M8 13V3m-4 4 4-4 4 4', stop: 'M4 4h8v8H4z',
         left: 'M2 2.5h12v11H2zM6 2.5v11m5-7-2 2 2 2', right: 'M2 2.5h12v11H2zM10 2.5v11M5 6.5l2 2-2 2',
         note: 'M12 8.5v5H2.5v-11H8m1 1 2-2 3 3-6.5 6.5-3 1 1-3z', link: 'm6.5 9.5 3-3M5 11l-1 1a2.8 2.8 0 0 1-4-4l3-3a2.8 2.8 0 0 1 4 0M11 5l1-1a2.8 2.8 0 0 0-4-4L5 3',
         globe: 'M14 8A6 6 0 1 1 2 8a6 6 0 0 1 12 0M2 8h12M8 2c-3 3-3 9 0 12 3-3 3-9 0-12', file: 'M3 2h6l4 4v8H3zM9 2v4h4M5 9h6M5 11h4',
         text: 'M3 3h10M8 3v10M5 13h6', pin: 'm5 2 6 1-2 4 2 3-7-1 2-3zm2 7-1 5', motion: 'M2 8c2-5 4 5 6 0s4 5 6 0',
+        sparkle: 'M8 2.2 9.4 6.6 13.8 8 9.4 9.4 8 13.8 6.6 9.4 2.2 8 6.6 6.6z', expand: 'M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9',
       }
       return h('svg', { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true', focusable: 'false' }, h('path', { d: paths[kind] || paths.file, stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round' }))
     }
@@ -995,7 +1175,7 @@ window.__ModuleLoader__.load({
         if (!node.open) node.showModal()
         return () => { node.removeEventListener('cancel', cancel); node.removeEventListener('click', outside); node.close(); if (opener?.isConnected) opener.focus() }
       }, [])
-      return h('dialog', { className: 'dsh-nb-dialog', ref, 'aria-labelledby': titleId },
+      return h('dialog', { className: 'dsh-nb-dialog', ref, 'aria-labelledby': titleId, 'data-detail-surface': 'dialog' },
         h('div', { className: 'dsh-nb-dialog-head' }, h('h3', { id: titleId }, title),
           h('span', { className: 'dsh-nb-activity-slot' }, busy ? h(ActivityIndicator, { motion }) : null),
           onStop ? h('button', { type: 'button', className: 'dsh-nb-chip', 'aria-label': '停止运行', 'data-action': 'dialog-stop', disabled: stopping, onClick: onStop }, '停止') : null,
@@ -1012,7 +1192,7 @@ window.__ModuleLoader__.load({
         // Only an exact ID in the active notebook can open a source. Legacy
         // full UUIDs are accepted, but abbreviated and unknown IDs stay text.
         const source = id && sources.find(item => item.id === id)
-        return source ? h('button', { type: 'button', className: 'dsh-nb-citation', key: index, title: source.title, 'aria-label': '查看引用：' + source.title, 'data-citation-source': source.id, onClick: () => onOpen(source.id) }, String(sources.indexOf(source) + 1)) : part
+        return source ? h('button', { type: 'button', className: 'dsh-nb-citation', key: index, title: source.title, 'aria-label': '查看引用：' + source.title, 'data-citation-source': source.id, onClick: event => onOpen(source.id, { spotlight: true, opener: event.currentTarget }) }, String(sources.indexOf(source) + 1)) : part
       }))
     }
     function SelectionCheckbox({ checked, mixed, disabled, onChange }) {
@@ -1162,14 +1342,22 @@ window.__ModuleLoader__.load({
       const [dialog, setDialog] = useState('')
       const [pane, setPane, paneDirection] = useSegmentSelection('chat', PANE_ORDER)
       const [ui, setUi] = useState(rememberedUi)
+      const [sourceId, setSourceId] = useState('')
       const [source, setSource] = useState(null)
+      const [spotlightSeq, setSpotlightSeq] = useState(0)
       const [sourceName, setSourceName] = useState('')
       const [confirmDelete, setConfirmDelete] = useState(false)
       const [artifactId, setArtifactId] = useState('')
       const [artifact, setArtifact] = useState(null)
-      const [studyReturnId, setStudyReturnId] = useState('')
+      const [artifactReload, setArtifactReload] = useState(0)
+      const [studioWide, setStudioWide] = useState(false)
+      const [activeSide, setActiveSide] = useState('studio')
       const [studyBusy, setStudyBusy] = useState(false)
       const [workspaceTitle, setWorkspaceTitle] = useState('')
+      const rootRef = useRef(null)
+      const sourceOpener = useRef(null), studioOpener = useRef(null)
+      const sourceReturnPane = useRef(''), studioReturnPane = useRef('')
+      const detailStack = useRef([])
       const active = useRef(workspaceId)
       const modeWrites = useRef(new Map())
       const lastModeSave = useRef(null)
@@ -1309,9 +1497,48 @@ window.__ModuleLoader__.load({
         loadCatalog()
         return () => { mounted.current = false; stateSequence.current++; detailSequence.current++; sourceSequence.current++ }
       }, [])
+      function pushDetail(side) {
+        detailStack.current = [...detailStack.current.filter(item => item !== side), side]
+        setActiveSide(side)
+      }
+      function closeSource(restoreFocus = false) {
+        detailStack.current = detailStack.current.filter(item => item !== 'sources')
+        sourceSequence.current++
+        setSourceId(''); setSource(null); setConfirmDelete(false)
+        const backPane = sourceReturnPane.current
+        sourceReturnPane.current = ''
+        if (backPane) setPane(backPane)
+        const opener = sourceOpener.current
+        sourceOpener.current = null
+        if (restoreFocus && opener?.isConnected) queueMicrotask(() => { if (opener.isConnected) opener.focus({ preventScroll: true }) })
+      }
+      function closeArtifact(restoreFocus = false) {
+        detailStack.current = detailStack.current.filter(item => item !== 'studio')
+        detailSequence.current++
+        setArtifactId(''); setArtifact(null); setStudioWide(false); setStudyBusy(false)
+        const backPane = studioReturnPane.current
+        studioReturnPane.current = ''
+        if (backPane) setPane(backPane)
+        const opener = studioOpener.current
+        studioOpener.current = null
+        if (restoreFocus && opener?.isConnected) queueMicrotask(() => { if (opener.isConnected) opener.focus({ preventScroll: true }) })
+      }
+      function openArtifact(id, options = {}) {
+        if (!id) return
+        studioOpener.current = options.opener || document.activeElement
+        pushDetail('studio')
+        setUi(current => current.studioCollapsed ? { ...current, studioCollapsed: false } : current)
+        const width = rootRef.current?.getBoundingClientRect().width || window.innerWidth
+        if (width < 1000 && pane !== 'studio') {
+          studioReturnPane.current = pane
+          setPane('studio')
+        }
+        setArtifact(null); setArtifactId(id); setArtifactReload(count => count + 1)
+      }
       useEffect(() => {
         active.current = workspaceId
-        setState(null); setPending({}); setError(''); setNotice(''); setQuestion(''); setSource(null); setArtifact(null); setArtifactId(''); setDialog(''); setAdding(''); setSourceTitle(''); setDraft(''); setPath(''); setUrl(''); setNotebookTitle(''); setSourceFilter('')
+        detailStack.current = []; sourceReturnPane.current = ''; studioReturnPane.current = ''
+        setState(null); setPending({}); setError(''); setNotice(''); setQuestion(''); setSourceId(''); setSource(null); setArtifact(null); setArtifactId(''); setStudioWide(false); setStudyBusy(false); setDialog(''); setAdding(''); setSourceTitle(''); setDraft(''); setPath(''); setUrl(''); setNotebookTitle(''); setSourceFilter('')
         try { if (workspaceId) localStorage.setItem(STORAGE_KEY, workspaceId) } catch {}
         refresh(workspaceId)
         const timer = setInterval(() => refresh(workspaceId, true), 2000)
@@ -1319,8 +1546,9 @@ window.__ModuleLoader__.load({
       }, [workspaceId])
       useEffect(() => {
         detailSequence.current++; sourceSequence.current++
-        setArtifactId(''); setArtifact(null); setSource(null); setSourceName(''); setConfirmDelete(false); setStudyReturnId('')
-        setDialog(value => ['source', 'artifact', 'add-source'].includes(value) ? '' : value)
+        detailStack.current = []; sourceReturnPane.current = ''; studioReturnPane.current = ''
+        setArtifactId(''); setArtifact(null); setStudioWide(false); setStudyBusy(false); setSourceId(''); setSource(null); setSourceName(''); setConfirmDelete(false)
+        setDialog(value => value === 'add-source' ? '' : value)
       }, [state?.notebookId])
       useEffect(() => {
         if (!workspace?.id || (workspace.provider && workspace.model) || !hasRoute) return
@@ -1333,14 +1561,29 @@ window.__ModuleLoader__.load({
         if (threadRef.current && followThread.current) threadRef.current.scrollTop = messages.length ? threadRef.current.scrollHeight : 0
       }, [messages.length, messages[messages.length - 1]?.text, task?.status, research?.status])
       useEffect(() => {
-        if (dialog !== 'artifact' || !artifactId || !workspaceId || !artifacts.some(item => item.id === artifactId)) return
+        if (!artifactId || !workspaceId || !artifacts.some(item => item.id === artifactId)) return
         const target = workspaceId
         const sequence = ++detailSequence.current
         api({ op: 'artifact', workspaceId: target, id: artifactId }).then(result => {
           if (mounted.current && active.current === target && detailSequence.current === sequence) setArtifact(result.artifact)
         }).catch(err => { if (mounted.current && active.current === target && detailSequence.current === sequence) setError(err.message) })
         return () => { detailSequence.current++ }
-      }, [workspaceId, artifactId, state?.artifacts, dialog])
+      }, [workspaceId, artifactId, artifactReload, state?.artifacts])
+      useEffect(() => {
+        if (dialog || (!sourceId && !artifactId)) return
+        const onKeyDown = event => {
+          if (event.key !== 'Escape' || event.defaultPrevented) return
+          if (document.querySelector('.dsh-nb-model-list:popover-open')) return
+          event.preventDefault()
+          const top = detailStack.current.at(-1)
+          if (top === 'sources' && sourceId) closeSource(true)
+          else if (top === 'studio' && artifactId) closeArtifact(true)
+          else if (sourceId) closeSource(true)
+          else if (artifactId) closeArtifact(true)
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+      }, [dialog, sourceId, artifactId])
       useEffect(() => {
         try { localStorage.setItem(UI_STORAGE_KEY, JSON.stringify(ui)) } catch {}
       }, [ui.sourcesCollapsed, ui.studioCollapsed, ui.motion])
@@ -1385,11 +1628,21 @@ window.__ModuleLoader__.load({
         const result = await run('researchStart', { prompt: researchPrompt.trim(), title: researchTitle.trim(), targetSources: researchTarget, newNotebook: researchNewNotebook, provider: providerId, model: modelId })
         if (result) { setQuestion(''); setDialog(''); setPane('chat') }
       }
-      async function viewSource(id) {
+      async function viewSource(id, options = {}) {
+        if (!id) return
         const target = workspaceId
         const sequence = ++sourceSequence.current
         const targetNotebook = notebookScope.current
-        setDialog('source'); setSource(null); setConfirmDelete(false)
+        sourceOpener.current = options.opener || document.activeElement
+        pushDetail('sources')
+        setUi(current => current.sourcesCollapsed ? { ...current, sourcesCollapsed: false } : current)
+        const width = rootRef.current?.getBoundingClientRect().width || window.innerWidth
+        if (width < 760 && pane !== 'sources') {
+          sourceReturnPane.current = pane
+          setPane('sources')
+        }
+        setSourceId(id); setSource(null); setConfirmDelete(false)
+        setSpotlightSeq(count => options.spotlight ? count + 1 : 0)
         try {
           const result = await api({ op: 'source', workspaceId: target, id })
           if (mounted.current && active.current === target && notebookScope.current === targetNotebook && sequence === sourceSequence.current) { setSource(result.source); setSourceName(result.source.title || '') }
@@ -1400,8 +1653,10 @@ window.__ModuleLoader__.load({
         if (result) { setDraft(''); setPath(''); setUrl(''); setSourceTitle(''); setAdding(''); setDialog('') }
       }
       const filtered = sources.filter(item => !sourceFilter || (item.title || '').toLowerCase().includes(sourceFilter.toLowerCase()))
-      const activityRunning = running || busyStudio || Object.values(pending).some(Boolean) || (!state && !error && !catalogError)
-      const dialogBusy = activityRunning || (dialog === 'source' && !source && !error) || (dialog === 'artifact' && ((!artifact && !error) || (artifact && pendingArtifact(artifact)) || studyBusy))
+      const sourceBusy = Boolean(sourceId && !source && !error)
+      const artifactBusy = Boolean(artifactId && ((!artifact && !error) || (artifact && pendingArtifact(artifact)) || studyBusy))
+      const activityRunning = running || busyStudio || sourceBusy || artifactBusy || Object.values(pending).some(Boolean) || (!state && !error && !catalogError)
+      const dialogBusy = activityRunning
       const chip = (label, onClick, extra = {}) => h('button', { className: 'dsh-nb-chip', type: 'button', onClick, ...extra }, label)
       const iconButton = (kind, label, onClick, extra = {}) => h('button', { className: 'dsh-nb-icon-button', type: 'button', 'aria-label': label, title: label, onClick, ...extra }, h(UiIcon, { kind }))
       const menuButton = (kind, label, onClick, extra = {}) => h('button', { className: 'dsh-nb-quiet', type: 'button', onClick, ...extra }, h(UiIcon, { kind }), h('span', null, label))
@@ -1415,16 +1670,12 @@ window.__ModuleLoader__.load({
       const retryAnswer = taskError && !error && !catalogMessage && previousQuestion
       const status = !dialog && statusText ? h('div', { className: 'dsh-nb-status ' + (error || taskError ? 'dsh-nb-error' : 'dsh-nb-notice'), role: error || taskError ? 'alert' : 'status' },
         h('span', null, statusText), retryAnswer ? chip('重新发送', () => ask(previousQuestion), { disabled: running || !hasRoute, 'data-action': 'retry-answer' }) : error || taskError || catalogMessage ? chip(error || taskError ? '重试' : '刷新模型', retry, { 'data-action': 'retry' }) : notice ? iconButton('close', '关闭提示', () => setNotice('')) : null) : null
-      const closeDialog = () => {
-        if (dialog === 'source' && studyReturnId && artifacts.some(item => item.id === studyReturnId)) { setArtifactId(studyReturnId); setDialog('artifact') }
-        else setDialog('')
-        setStudyReturnId(''); setConfirmDelete(false); sourceSequence.current++
-      }
+      const closeDialog = () => { setDialog('') }
       function showPane(value) { setPane(value); if (value === 'sources') setUi(current => ({ ...current, sourcesCollapsed: false })); if (value === 'studio') setUi(current => ({ ...current, studioCollapsed: false })) }
       function togglePanel(which) { setUi(current => ({ ...current, [which]: !current[which] })) }
       async function openNotebook(id) {
         if (!id) return
-        if (await run('open', { notebookId: id })) { setSource(null); setArtifact(null); setArtifactId(''); setDialog('') }
+        if (await run('open', { notebookId: id })) { closeSource(false); closeArtifact(false); setDialog('') }
       }
       const artifactStatus = value => ({ done: '完成', failed: '失败', cancelled: '已停止', pending: '', queued: '', running: '' })[value] || ''
       const artifactLabel = item => item.title && item.title !== item.kind ? item.title : STUDIO.find(entry => entry[0] === item.kind)?.[1] || item.kind
@@ -1437,9 +1688,9 @@ window.__ModuleLoader__.load({
         research.error || research.artifactError ? h('p', { className: 'dsh-nb-research-error', role: 'alert' }, research.error || research.artifactError) : null,
         ['partial', 'cancelled', 'interrupted'].includes(research.status) ? h('p', { className: 'dsh-nb-meta' }, '已保存的资料仍可使用。可查看来源，或重新构建并选择补充当前笔记本。') : null,
         !researchRunning ? h('details', null, h('summary', null, research.failures?.length ? '查看来源与未完成项目' : '查看来源'),
-          imported.length ? h('div', null, h('p', { className: 'dsh-nb-meta' }, '已保存来源'), h('ul', { className: 'dsh-nb-research-imported' }, imported.map((item, index) => h('li', { key: item.sourceId || index }, h('button', { type: 'button', disabled: !sources.some(source => source.id === item.sourceId), onClick: () => viewSource(item.sourceId) }, item.title || item.url || '来源'), h('div', { className: 'dsh-nb-meta' }, [item.url, item.reused ? '复用已有来源' : '', item.truncated ? '正文已截取，请核对完整原文' : ''].filter(Boolean).join(' · ')))))) : null,
+          imported.length ? h('div', null, h('p', { className: 'dsh-nb-meta' }, '已保存来源'), h('ul', { className: 'dsh-nb-research-imported' }, imported.map((item, index) => h('li', { key: item.sourceId || index }, h('button', { type: 'button', disabled: !sources.some(source => source.id === item.sourceId), onClick: event => viewSource(item.sourceId, { spotlight: true, opener: event.currentTarget }) }, item.title || item.url || '来源'), h('div', { className: 'dsh-nb-meta' }, [item.url, item.reused ? '复用已有来源' : '', item.truncated ? '正文已截取，请核对完整原文' : ''].filter(Boolean).join(' · ')))))) : null,
           research.failures?.length ? h('div', null, h('p', { className: 'dsh-nb-meta' }, '未完成项目'), h('ul', { className: 'dsh-nb-research-failures' }, research.failures.map((item, index) => h('li', { key: index }, item.url ? h('span', { className: 'dsh-nb-meta' }, item.url + '：') : null, item.error || item.message || '未能完成')))) : null) : null,
-        !running && imported.length && researchInNotebook ? h('div', { className: 'dsh-nb-research-actions' }, chip('进入资料问答', async () => { if (await chooseMode('sources')) { setPane('chat'); composerRef.current?.focus() } }, { 'data-action': 'research-ask', disabled: !selected || pending.workspaceUpdate }), research.artifactId ? chip('打开学习指南', () => { setArtifactId(research.artifactId); setArtifact(null); setDialog('artifact') }, { 'data-action': 'research-guide', disabled: !artifacts.some(item => item.id === research.artifactId) }) : null) : !running && !researchInNotebook ? h('div', { className: 'dsh-nb-research-actions' }, chip('打开研究笔记本', () => openNotebook(research.notebookId), { 'data-action': 'research-notebook', disabled: !state?.notebooks?.some(item => item.id === research.notebookId) || pending.open })) : null) : null
+        !running && imported.length && researchInNotebook ? h('div', { className: 'dsh-nb-research-actions' }, chip('进入资料问答', async () => { if (await chooseMode('sources')) { setPane('chat'); composerRef.current?.focus() } }, { 'data-action': 'research-ask', disabled: !selected || pending.workspaceUpdate }), research.artifactId ? chip('打开学习指南', event => openArtifact(research.artifactId, { opener: event.currentTarget }), { 'data-action': 'research-guide', disabled: !artifacts.some(item => item.id === research.artifactId) }) : null) : !running && !researchInNotebook ? h('div', { className: 'dsh-nb-research-actions' }, chip('打开研究笔记本', () => openNotebook(research.notebookId), { 'data-action': 'research-notebook', disabled: !state?.notebooks?.some(item => item.id === research.notebookId) || pending.open })) : null) : null
       let dialogTitle = '', dialogContent = null
       if (dialog === 'research') {
         dialogTitle = '自动构建笔记本'
@@ -1497,104 +1748,126 @@ window.__ModuleLoader__.load({
             adding === 'url' ? h('label', null, '网页地址', h('input', { className: 'dsh-nb-field', 'aria-label': '来源网址', placeholder: 'https://', value: url, onChange: event => setUrl(event.target.value) })) :
             h('label', null, '本地文本文件路径', h('input', { className: 'dsh-nb-field', 'aria-label': '文本文件绝对路径', placeholder: '/Users/…/研究笔记.md', value: path, onChange: event => setPath(event.target.value) }), h('span', { className: 'dsh-nb-meta' }, '支持 TXT、Markdown、CSV、JSON 等文本文件。')),
           h('div', { className: 'dsh-nb-form-actions' }, h('button', { className: 'dsh-nb-chip primary', type: 'submit', disabled: running || Boolean(pending.addText || pending.addFile || pending.addUrl || pending.saveNote) || !(adding === 'file' ? path.trim() : adding === 'url' ? url.trim() : draft.trim()), 'data-action': 'add-source' }, adding === 'note' ? '保存笔记' : '加入来源')))
-      } else if (dialog === 'source') {
-        dialogTitle = source?.title || '来源原文'
-        dialogContent = source ? h('div', { className: 'dsh-nb-source-detail' },
-          studyReturnId ? chip('返回练习', closeDialog, { 'data-action': 'study-return' }) : null,
-          h('form', { className: 'dsh-nb-source-tools', onSubmit: async event => { event.preventDefault(); if (sourceName.trim() && await run('renameSource', { id: source.id, title: sourceName.trim() })) setSource(current => current ? { ...current, title: sourceName.trim() } : current) } },
-            h('input', { className: 'dsh-nb-field', 'aria-label': '来源名称', value: sourceName, onChange: event => setSourceName(event.target.value) }), h('button', { className: 'dsh-nb-chip', type: 'submit', disabled: running || !sourceName.trim() || pending.renameSource }, '保存名称')),
-          h('div', { className: 'dsh-nb-meta' }, source.locator || source.url || source.path || source.kind),
-          source.provenance?.fetchedAt ? h('p', { className: 'dsh-nb-meta', 'data-source-provenance': 'fetched-at' }, '正文获取时间：' + (Number.isNaN(new Date(source.provenance.fetchedAt).getTime()) ? String(source.provenance.fetchedAt) : new Date(source.provenance.fetchedAt).toLocaleString())) : null,
-          source.provenance?.requestedUrl ? h('p', { className: 'dsh-nb-meta', 'data-source-provenance': 'requested-url' }, '原始请求网址：' + source.provenance.requestedUrl) : null,
-          source.provenance?.truncated ? h('p', { className: 'dsh-nb-research-error', 'data-source-provenance': 'truncated' }, '已保存的正文经过截取，可能缺少部分内容；请结合原始网页核对。') : null,
-          h('pre', { className: 'dsh-nb-source-body' }, source.body || source.text || '来源内容为空。'),
-          h('div', { className: 'dsh-nb-form-actions' }, chip(confirmDelete ? '确认删除来源' : '删除来源', async () => { if (!confirmDelete) { setConfirmDelete(true); return } if (await run('deleteSource', { id: source.id })) { setSource(null); setConfirmDelete(false); setDialog('') } }, { className: 'dsh-nb-chip danger', disabled: running || pending.deleteSource }), confirmDelete ? chip('取消', () => setConfirmDelete(false)) : null)) : null
-      } else if (dialog === 'artifact') {
-        dialogTitle = artifact ? artifactLabel(artifact) : 'Studio 产物'
-        const practice = artifact && ['quiz', 'flashcards'].includes(artifact.kind)
-        const regenerate = async () => {
-          const result = await run('generate', { kind: artifact.kind, prompt: '', provider: providerId, model: modelId }, 'generate:' + artifact.kind)
-          if (result?.artifactId) { setArtifactId(result.artifactId); setArtifact(null); setDialog('artifact') }
-        }
-        dialogContent = practice && artifact.status === 'done' ? h(StudyPractice, {
-          key: workspaceId + ':' + state.notebookId + ':' + artifact.id, artifact, workspaceId, notebookId: state.notebookId, hostSessionId: sessionId, sources,
-          onOpenSource: id => { setStudyReturnId(artifact.id); viewSource(id) }, onRegenerate: regenerate,
-          canRegenerate: Boolean(selected && hasRoute && !running && !busyStudio), regenerating: Boolean(pending['generate:' + artifact.kind]), onBusyChange: setStudyBusy,
-        }) : practice ? !pendingArtifact(artifact) ? h('div', { className: 'dsh-nb-form' },
-          h('p', { className: 'dsh-nb-research-error', role: 'alert' }, artifact.error || '这份练习没有完成，请重新生成。'),
-          chip('重新生成练习', regenerate, { disabled: !selected || !hasRoute || running || busyStudio, 'data-action': 'study-regenerate' })) : null : artifact ? h('div', { className: 'dsh-nb-form' },
-          artifactStatus(artifact.status) ? h('p', { className: 'dsh-nb-meta', role: 'status' }, artifactStatus(artifact.status)) : null,
-          artifact.error ? h('p', { className: 'dsh-nb-research-error', role: 'alert' }, artifact.error) : null,
-          artifact.body ? h('pre', { className: 'dsh-nb-preview' }, ['study-guide', 'briefing', 'report'].includes(artifact.kind) ? h(CitationText, { text: artifact.body, sources, onOpen: viewSource }) : artifact.body) : artifact.status === 'done' ? h('p', { className: 'dsh-nb-meta' }, '内容为空。') : null) : null
       }
-      return h('div', { className: 'dsh-nb dsh-nb-workbench', 'data-workspace-id': workspace?.id || '', 'data-notebook-id': state?.notebookId || '', 'data-pane': pane, 'data-pane-direction': paneDirection, 'data-mode': mode, 'data-running': String(running), 'data-motion': ui.motion ? 'enabled' : 'static', 'data-sources-collapsed': String(ui.sourcesCollapsed), 'data-studio-collapsed': String(ui.studioCollapsed) },
-        h('header', { className: 'dsh-nb-toolbar' },
-          h('span', { className: 'dsh-nb-toolbar-brand' }, h(NotebookIcon, { size: 22 })),
-          h('button', { type: 'button', className: 'dsh-nb-notebook-trigger', 'aria-label': '切换或管理笔记本', 'aria-haspopup': 'dialog', onClick: () => setDialog('notebooks'), 'data-action': 'notebooks' }, h('span', null, notebook?.title || 'Notebook'), h(UiIcon, { kind: 'chevron' })),
-          h('span', { className: 'dsh-nb-activity-slot' }, activityRunning && !dialog ? h(ActivityIndicator, { motion: ui.motion }) : null),
-          h('span', { className: 'dsh-nb-sr-only', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' }, task?.status === 'done' && !task.automaticResearch ? '回答已完成' : ''),
-          h('div', { className: 'dsh-nb-toolbar-controls' },
-            menuButton('history', '会话', () => setDialog('history'), { 'aria-label': '会话历史', 'data-action': 'history' }),
-            menuButton('plus', '新对话', createWorkspace, { 'aria-label': '新建对话', disabled: pending.workspaceCreate, 'data-action': 'new-workspace' }),
-            iconButton('more', '更多操作', () => setDialog('more'), { 'data-action': 'more' }))),
-        h('nav', { className: 'dsh-nb-pane-tabs', 'aria-label': '工作区域' },
-          h('div', { className: 'dsh-nb-pane-switch' },
-            h(SwitchTrack, { index: PANE_ORDER.indexOf(pane), count: PANE_ORDER.length, backwards: paneDirection === 'back' }),
-            PANE_ORDER.map(value => h('button', { key: value, type: 'button', 'aria-pressed': pane === value, 'data-pane-target': value, onClick: () => showPane(value) },
-              value === 'sources' ? '来源 ' + sources.length : value === 'chat' ? '对话' : 'Studio')))),
-        h('div', { className: 'dsh-nb-grid' },
-          h('section', { className: 'dsh-nb-col is-sources', 'aria-label': '来源' },
-            h('div', { className: 'dsh-nb-rail' }, iconButton('left', '展开来源', () => togglePanel('sourcesCollapsed'), { 'data-action': 'expand-sources' }), h('span', null, '来源'), h('span', null, selected)),
-            h('div', { className: 'dsh-nb-head' }, h('span', { className: 'dsh-nb-title' }, '来源'), h('span', { className: 'dsh-nb-count' }, sources.length), iconButton('left', '收起来源', () => togglePanel('sourcesCollapsed'), { className: 'dsh-nb-icon-button dsh-nb-collapse', 'data-action': 'collapse-sources' })),
-            h('div', { className: 'dsh-nb-source-tools-row' }, chip('自动构建', openResearch, { className: 'dsh-nb-chip primary dsh-nb-build-entry', disabled: !workspace || running, 'data-action': 'open-research' }), chip([h(UiIcon, { key: 'icon', kind: 'plus' }), '添加来源'], () => { setAdding('text'); setDialog('add-source') }, { disabled: !notebook || running, 'data-action': 'open-add-source' }), iconButton('note', '创建笔记', () => { setAdding('note'); setDialog('add-source') }, { disabled: !notebook || running, 'data-action': 'new-note' })),
-            h('div', { className: 'dsh-nb-source-search' }, h('input', { className: 'dsh-nb-field', type: 'search', placeholder: '查找来源', 'aria-label': '查找来源', value: sourceFilter, onChange: event => setSourceFilter(event.target.value) })),
-            h('div', { className: 'dsh-nb-source-summary' }, h('span', null, '已选 ' + selected + ' 个'), h('label', null, '全选', h(SelectionCheckbox, { checked: readySources.length > 0 && selected === readySources.length, mixed: selected > 0 && selected < readySources.length, disabled: running || !readySources.length || pending.setSources, onChange: event => run('setSources', { changes: readySources.map(item => ({ id: item.id, enabled: event.target.checked })) }) }))),
-            h('div', { className: 'dsh-nb-scroll' }, filtered.map(item => h('div', { key: item.id, className: 'dsh-nb-source' },
-              h('button', { className: 'dsh-nb-source-open', type: 'button', title: item.title, onClick: () => viewSource(item.id) }, h(KindMark, { kind: item.kind }), h('span', { className: 'dsh-nb-copy' }, h('span', { className: 'dsh-nb-title' }, item.title), h('span', { className: 'dsh-nb-meta' }, (item.kind === 'url' ? '网页' : item.kind === 'file' ? '文件' : item.kind === 'note' ? '笔记' : '文本') + ' · ' + (item.status === 'ready' ? '可用' : item.status)))),
-              h('input', { className: 'dsh-nb-check', type: 'checkbox', 'aria-label': '使用来源：' + item.title, checked: item.enabled, disabled: running || pending.setSources, onChange: event => run('setSources', { changes: [{ id: item.id, enabled: event.target.checked }] }) }))),
-              !sources.length ? h('div', { className: 'dsh-nb-empty' }, h('p', { className: 'dsh-nb-meta' }, notebook ? '添加资料，或在「搜集构建」中描述研究目标。' : '创建笔记本，或直接描述研究目标。'), !notebook ? chip('创建笔记本', () => { setNotebookTitle(''); setDialog('create-notebook') }, { disabled: !workspace || running }) : null) : !filtered.length ? h('p', { className: 'dsh-nb-meta dsh-nb-empty' }, '没有匹配的来源。') : null),
-            h('div', { className: 'dsh-nb-foot' }, '勾选的来源用于回答和生成内容。')),
-          h('section', { className: 'dsh-nb-col is-main', 'aria-label': '研究对话' },
-            h('div', { className: 'dsh-nb-head' }, h('span', { className: 'dsh-nb-title', title: workspace?.title }, workspace?.title || '对话'), h('span', { className: 'dsh-nb-meta dsh-nb-scope' }, mode === 'sources' ? '基于 ' + selected + ' 个来源' : '可使用资料搜集工具')),
-            h('div', { className: 'dsh-nb-thread', ref: threadRef },
-              !messages.length && !research && state ? h('div', { className: 'dsh-nb-hero' }, h('span', { className: 'dsh-nb-hero-mark' }, h(ParticleWhale, { motion: ui.motion })), h('h2', null, mode === 'sources' ? '让资料，连成思路' : '从一个问题，开始研究'), h('p', { className: 'dsh-nb-meta' }, mode === 'sources' ? '从勾选来源出发，提问、比较，整理思路。' : '搜集资料、整理证据，逐步建立你的笔记本。'), h('div', { className: 'dsh-nb-suggest' }, mode === 'research' ? chip('自动构建笔记本', openResearch, { disabled: !workspace || running, 'data-action': 'hero-research' }) : null, (mode === 'sources' ? SUGGEST : ['围绕研究目标搜集资料', '读取本地资料，整理证据']).map(text => chip(text, () => { setQuestion(text); composerRef.current?.focus() }, { key: text, disabled: running })))) : null,
-              researchCard,
-              h('div', { className: 'dsh-nb-messages' }, messages.map((item, index) => h('article', { key: item.id || index, className: 'dsh-nb-message ' + item.role + (item.status === 'failed' ? ' is-failed' : '') },
-                h('div', { className: 'dsh-nb-message-meta' }, h('span', null, item.role === 'user' ? '你' : '助手'), ['failed', 'cancelled'].includes(item.status) ? h('span', null, item.status === 'failed' ? '未完成' : '已停止') : null),
-                h('div', { className: 'dsh-nb-message-body' }, h(CitationText, { text: item.text, sources, onOpen: viewSource })),
-                item.role === 'assistant' && String(item.text || '').trim() && !running ? h('div', { className: 'dsh-nb-message-actions' }, menuButton('pin', '保存到笔记', async () => { if (await run('saveNote', { title: (workspace?.title || '研究') + ' · 回答笔记', body: item.text }, 'note:' + item.id)) setNotice('已保存到当前笔记本。') }, { disabled: !notebook || pending['note:' + item.id], 'data-action': 'save-answer' })) : null))),
-              !running && task?.status === 'cancelled' && !research ? h('p', { className: 'dsh-nb-meta' }, '本次运行已停止。') : null),
-            status,
-            h('form', { className: 'dsh-nb-composer', onSubmit: event => { event.preventDefault(); if (canSend) ask(question) } },
-              h('textarea', { rows: 2, ref: composerRef, 'aria-label': '发送给模型的消息', placeholder: !hasRoute ? '选择可用模型后开始…' : mode === 'sources' ? '向这些资料提问…' : '描述研究目标，或提供网址和资料路径…', value: question, onChange: event => setQuestion(event.target.value), onKeyDown: event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && !event.nativeEvent?.isComposing && event.keyCode !== 229) { event.preventDefault(); if (canSend) ask(question) } } }),
-              h('div', { className: 'dsh-nb-composer-bottom' },
-                h('div', { className: 'dsh-nb-mode', role: 'group', 'aria-label': '工作模式' },
-                  h(SwitchTrack, { index: mode === 'sources' ? 0 : 1, count: 2, backwards: mode === 'sources' }),
-                  ['sources', 'research'].map(value => h('button', { key: value, type: 'button', className: mode === value ? 'on' : '', disabled: !workspace || running, 'aria-pressed': mode === value, onClick: () => chooseMode(value), 'data-mode': value }, value === 'sources' ? '资料问答' : '搜集构建'))),
-                h('div', { className: 'dsh-nb-composer-trailing' },
-                  h(ModelPicker, { ...modelPickerProps, label: '对话模型', disabled: !workspace || running }),
-                  running ? chip('停止', () => run('cancel'), { className: 'dsh-nb-chip dsh-nb-stop', disabled: pending.cancel, 'data-action': 'stop' }) : h('button', { className: 'dsh-nb-send', type: 'submit', disabled: !canSend, 'aria-label': '发送' }, h(UiIcon, { kind: 'send' }))))),
-            h('div', { className: 'dsh-nb-composer-hint' }, h('span', null, mode === 'sources' ? selected ? '仅依据勾选来源' : '请先勾选可用来源' : '可搜索网页、读取资料与创建笔记本'), h('span', null, 'Shift + Enter 换行'))),
-          h('section', { className: 'dsh-nb-col is-studio', 'aria-label': 'Studio' },
-            h('div', { className: 'dsh-nb-rail' }, iconButton('right', '展开 Studio', () => togglePanel('studioCollapsed'), { 'data-action': 'expand-studio' }), h('span', null, 'Studio')),
-            h('div', { className: 'dsh-nb-head' }, h('span', { className: 'dsh-nb-title' }, 'Studio'), iconButton('right', '收起 Studio', () => togglePanel('studioCollapsed'), { className: 'dsh-nb-icon-button dsh-nb-collapse', 'data-action': 'collapse-studio' })),
-            h('div', { className: 'dsh-nb-studio' }, h('div', { className: 'dsh-nb-studio-content' },
-              h('div', { className: 'dsh-nb-studio-grid' }, STUDIO.map(([kind, label, description]) => {
-                const busy = Boolean(pending['generate:' + kind]) || artifacts.some(item => item.kind === kind && pendingArtifact(item))
-                const guide = kind === 'study-guide'
-                return h('button', {
-                  key: kind, type: 'button', className: guide ? 'dsh-nb-card dsh-nb-guide-card' : 'dsh-nb-card',
-                  'data-studio-kind': kind, 'aria-busy': busy, title: description, disabled: !notebook || !selected || !hasRoute || busy || running,
-                  onClick: async () => {
-                    const result = await run('generate', { kind, prompt: question, provider: providerId, model: modelId }, 'generate:' + kind)
-                    if (result?.artifactId) { setArtifactId(result.artifactId); setArtifact(null); setDialog('artifact') }
-                  },
-                }, guide ? h('span', { className: 'dsh-nb-guide-art', 'aria-hidden': 'true' }, h('span', { className: 'dsh-nb-guide-sheet' })) : h(StudioGlyph, { kind }), h('strong', null, label), guide ? h('small', null, description) : null)
-              })),
-              !notebook || !selected ? h('p', { className: 'dsh-nb-meta' }, '勾选来源后即可生成内容。') : !hasRoute ? h('p', { className: 'dsh-nb-meta' }, '选择模型后即可生成内容。') : null,
-              h('h3', { className: 'dsh-nb-art-heading' }, '已生成', h('small', null, String(artifacts.length))),
-              artifacts.map(item => h('button', { key: item.id, className: 'dsh-nb-art', type: 'button', 'data-artifact-id': item.id, 'data-studio-kind': item.kind, onClick: () => { setArtifactId(item.id); setArtifact(null); setStudyReturnId(''); setDialog('artifact') } }, h(StudioGlyph, { kind: item.kind }), h('span', { className: 'dsh-nb-art-copy' }, h('strong', null, artifactLabel(item)), h('small', null, [artifactStatus(item.status), (item.created_at || item.createdAt) && new Date(item.created_at || item.createdAt).toLocaleDateString()].filter(Boolean).join(' · '))), h('span', { className: 'dsh-nb-art-open', 'aria-hidden': 'true' }, h(UiIcon, { kind: 'chevron', size: 14 })))),
-              !artifacts.length ? h('p', { className: 'dsh-nb-meta' }, '生成的内容会保存在这里。') : null)))),
+
+      const sourceDetailContent = sourceId ? h('div', { key: 'src-' + sourceId, className: 'dsh-nb-inpane', 'data-detail-surface': 'source', role: 'region', 'aria-label': '来源原文详情' },
+        h('div', { className: 'dsh-nb-inpane-head' },
+          h('button', { type: 'button', className: 'dsh-nb-inpane-back', onClick: () => closeSource(true) }, h(UiIcon, { kind: 'back', size: 13 }), h('span', null, '来源')),
+          h('h3', { title: source?.title || '来源原文' }, source?.title || '来源原文'),
+          h('div', { className: 'dsh-nb-inpane-actions' },
+            iconButton('close', '关闭详情', () => closeSource(true)))),
+        h('div', { className: 'dsh-nb-inpane-body' },
+          source ? h('div', { key: 'spot-' + spotlightSeq, className: 'dsh-nb-source-detail' + (spotlightSeq ? ' is-spotlight' : '') },
+            h('form', { className: 'dsh-nb-source-tools', onSubmit: async event => { event.preventDefault(); if (sourceName.trim() && await run('renameSource', { id: source.id, title: sourceName.trim() })) setSource(current => current ? { ...current, title: sourceName.trim() } : current) } },
+              h('input', { className: 'dsh-nb-field', 'aria-label': '来源名称', value: sourceName, onChange: event => setSourceName(event.target.value) }), h('button', { className: 'dsh-nb-chip', type: 'submit', disabled: running || !sourceName.trim() || pending.renameSource }, '保存名称')),
+            h('div', { className: 'dsh-nb-meta' }, source.locator || source.url || source.path || source.kind),
+            source.provenance?.fetchedAt ? h('p', { className: 'dsh-nb-meta', 'data-source-provenance': 'fetched-at' }, '正文获取时间：' + (Number.isNaN(new Date(source.provenance.fetchedAt).getTime()) ? String(source.provenance.fetchedAt) : new Date(source.provenance.fetchedAt).toLocaleString())) : null,
+            source.provenance?.requestedUrl ? h('p', { className: 'dsh-nb-meta', 'data-source-provenance': 'requested-url' }, '原始请求网址：' + source.provenance.requestedUrl) : null,
+            source.provenance?.truncated ? h('p', { className: 'dsh-nb-research-error', 'data-source-provenance': 'truncated' }, '已保存的正文经过截取，可能缺少部分内容；请结合原始网页核对。') : null,
+            h('pre', { className: 'dsh-nb-source-body' }, source.body || source.text || '来源内容为空。'),
+            h('div', { className: 'dsh-nb-form-actions' }, chip(confirmDelete ? '确认删除来源' : '删除来源', async () => { if (!confirmDelete) { setConfirmDelete(true); return } if (await run('deleteSource', { id: source.id })) closeSource(false) }, { className: 'dsh-nb-chip danger', disabled: running || pending.deleteSource }), confirmDelete ? chip('取消', () => setConfirmDelete(false)) : null)) : !error ? h('p', { className: 'dsh-nb-meta' }, '正在读取来源原文…') : null)) : null
+
+      const practice = artifact && ['quiz', 'flashcards'].includes(artifact.kind)
+      const regenerate = artifact ? async () => {
+        const result = await run('generate', { kind: artifact.kind, prompt: '', provider: providerId, model: modelId }, 'generate:' + artifact.kind)
+        if (result?.artifactId) openArtifact(result.artifactId)
+      } : null
+      const studioDetailContent = artifactId ? h('div', { key: 'art-' + artifactId, className: 'dsh-nb-inpane', 'data-detail-surface': 'artifact', role: 'region', 'aria-label': 'Studio 详情' },
+        h('div', { className: 'dsh-nb-inpane-head' },
+          h('button', { type: 'button', className: 'dsh-nb-inpane-back', onClick: () => closeArtifact(true) }, h(UiIcon, { kind: 'back', size: 13 }), h('span', null, 'Studio')),
+          h('h3', { title: artifact ? artifactLabel(artifact) : 'Studio 产物' }, artifact ? artifactLabel(artifact) : 'Studio 产物'),
+          h('div', { className: 'dsh-nb-inpane-actions' },
+            iconButton('expand', studioWide ? '还原面板宽度' : '拓宽详情面板', () => setStudioWide(value => !value), { className: 'dsh-nb-icon-button dsh-nb-inpane-wide', 'aria-pressed': studioWide, 'data-action': 'toggle-studio-wide' }),
+            iconButton('close', '关闭详情', () => closeArtifact(true)))),
+        h('div', { className: 'dsh-nb-inpane-body' },
+          practice && artifact.status === 'done' ? h(StudyPractice, {
+            key: workspaceId + ':' + state.notebookId + ':' + artifact.id, artifact, workspaceId, notebookId: state.notebookId, hostSessionId: sessionId, sources,
+            onOpenSource: (id, opts) => viewSource(id, { spotlight: true, ...opts }), onRegenerate: regenerate,
+            canRegenerate: Boolean(selected && hasRoute && !running && !busyStudio), regenerating: Boolean(pending['generate:' + artifact.kind]), onBusyChange: setStudyBusy,
+          }) : practice ? !pendingArtifact(artifact) ? h('div', { className: 'dsh-nb-form' },
+            h('p', { className: 'dsh-nb-research-error', role: 'alert' }, artifact.error || '这份练习没有完成，请重新生成。'),
+            chip('重新生成练习', regenerate, { disabled: !selected || !hasRoute || running || busyStudio, 'data-action': 'study-regenerate' })) : h('p', { className: 'dsh-nb-meta' }, '正在生成练习…') : artifact ? h('div', { className: 'dsh-nb-form' },
+            artifactStatus(artifact.status) ? h('p', { className: 'dsh-nb-meta', role: 'status' }, artifactStatus(artifact.status)) : null,
+            artifact.error ? h('p', { className: 'dsh-nb-research-error', role: 'alert' }, artifact.error) : null,
+            artifact.body ? h('pre', { className: 'dsh-nb-preview' }, ['study-guide', 'briefing', 'report'].includes(artifact.kind) ? h(CitationText, { text: artifact.body, sources, onOpen: viewSource }) : artifact.body) : artifact.status === 'done' ? h('p', { className: 'dsh-nb-meta' }, '内容为空。') : pendingArtifact(artifact) ? h('p', { className: 'dsh-nb-meta' }, '正在生成内容，后台任务完成后自动刷新…') : null) : !error ? h('p', { className: 'dsh-nb-meta' }, '正在加载内容…') : null)) : null
+
+      return h('div', { ref: rootRef, className: 'dsh-nb dsh-nb-workbench', 'data-workspace-id': workspace?.id || '', 'data-notebook-id': state?.notebookId || '', 'data-pane': pane, 'data-pane-direction': paneDirection, 'data-mode': mode, 'data-running': String(running), 'data-motion': ui.motion ? 'enabled' : 'static', 'data-sources-collapsed': String(ui.sourcesCollapsed), 'data-studio-collapsed': String(ui.studioCollapsed), 'data-source-open': String(Boolean(sourceId)), 'data-studio-open': String(Boolean(artifactId)), 'data-studio-wide': String(Boolean(studioWide)), 'data-active-side': activeSide },
+        h('div', { className: 'dsh-nb-stage' },
+          h('header', { className: 'dsh-nb-toolbar' },
+            h('span', { className: 'dsh-nb-toolbar-brand' }, h(NotebookIcon, { size: 22 })),
+            h('button', { type: 'button', className: 'dsh-nb-notebook-trigger', 'aria-label': '切换或管理笔记本', 'aria-haspopup': 'dialog', onClick: () => setDialog('notebooks'), 'data-action': 'notebooks' }, h('span', null, notebook?.title || 'Notebook'), h(UiIcon, { kind: 'chevron' })),
+            h('span', { className: 'dsh-nb-activity-slot' }, activityRunning && !dialog ? h(ActivityIndicator, { motion: ui.motion }) : null),
+            h('span', { className: 'dsh-nb-sr-only', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' }, task?.status === 'done' && !task.automaticResearch ? '回答已完成' : ''),
+            h('div', { className: 'dsh-nb-toolbar-controls' },
+              menuButton('history', '会话', () => setDialog('history'), { 'aria-label': '会话历史', 'data-action': 'history' }),
+              menuButton('plus', '新对话', createWorkspace, { 'aria-label': '新建对话', disabled: pending.workspaceCreate, 'data-action': 'new-workspace' }),
+              iconButton('more', '更多操作', () => setDialog('more'), { 'data-action': 'more' }))),
+          h('nav', { className: 'dsh-nb-pane-tabs', 'aria-label': '工作区域' },
+            h('div', { className: 'dsh-nb-pane-switch' },
+              h(SwitchTrack, { index: PANE_ORDER.indexOf(pane), count: PANE_ORDER.length, backwards: paneDirection === 'back' }),
+              PANE_ORDER.map(value => h('button', { key: value, type: 'button', 'aria-pressed': pane === value, 'data-pane-target': value, onClick: () => showPane(value) },
+                value === 'sources' ? '来源 ' + sources.length : value === 'chat' ? '对话' : 'Studio')))),
+          h('div', { className: 'dsh-nb-grid' },
+            h('section', { className: 'dsh-nb-col is-sources', 'aria-label': '来源', onClick: () => { if (sourceId && activeSide !== 'sources') setActiveSide('sources') } },
+              h('div', { className: 'dsh-nb-rail' }, iconButton('left', '展开来源', () => togglePanel('sourcesCollapsed'), { 'data-action': 'expand-sources' }), h('span', null, '来源'), h('span', null, selected)),
+              h('div', { className: 'dsh-nb-pane-list' + (sourceId ? ' is-recessed' : ''), 'aria-hidden': sourceId ? 'true' : undefined },
+                h('div', { className: 'dsh-nb-head' }, h('span', { className: 'dsh-nb-title' }, '来源'), h('span', { className: 'dsh-nb-count' }, sources.length), iconButton('left', '收起来源', () => togglePanel('sourcesCollapsed'), { className: 'dsh-nb-icon-button dsh-nb-collapse', 'data-action': 'collapse-sources' })),
+                h('div', { className: 'dsh-nb-source-tools-row' },
+                  chip([h(UiIcon, { key: 'icon', kind: 'plus', size: 13 }), '添加来源'], () => { setAdding('text'); setDialog('add-source') }, { disabled: !notebook || running, 'data-action': 'open-add-source' }),
+                  chip([h(UiIcon, { key: 'icon', kind: 'sparkle', size: 12 }), '自动构建'], openResearch, { className: 'dsh-nb-chip primary dsh-nb-build-entry', disabled: !workspace || running, 'data-action': 'open-research' }),
+                  iconButton('note', '创建笔记', () => { setAdding('note'); setDialog('add-source') }, { disabled: !notebook || running, 'data-action': 'new-note' })),
+                h('div', { className: 'dsh-nb-source-search' }, h('input', { className: 'dsh-nb-field', type: 'search', placeholder: '查找来源', 'aria-label': '查找来源', value: sourceFilter, onChange: event => setSourceFilter(event.target.value) })),
+                h('div', { className: 'dsh-nb-source-summary' }, h('span', null, '已选 ' + selected + ' 个'), h('label', null, '全选', h(SelectionCheckbox, { checked: readySources.length > 0 && selected === readySources.length, mixed: selected > 0 && selected < readySources.length, disabled: running || !readySources.length || pending.setSources, onChange: event => run('setSources', { changes: readySources.map(item => ({ id: item.id, enabled: event.target.checked })) }) }))),
+                h('div', { className: 'dsh-nb-scroll' }, filtered.map(item => h('div', { key: item.id, className: 'dsh-nb-source' + (sourceId === item.id ? ' is-active' : '') },
+                  h('button', { className: 'dsh-nb-source-open', type: 'button', title: item.title, onClick: event => viewSource(item.id, { opener: event.currentTarget }) }, h(KindMark, { kind: item.kind }), h('span', { className: 'dsh-nb-copy' }, h('span', { className: 'dsh-nb-title' }, item.title), h('span', { className: 'dsh-nb-meta' }, (item.kind === 'url' ? '网页' : item.kind === 'file' ? '文件' : item.kind === 'note' ? '笔记' : '文本') + ' · ' + (item.status === 'ready' ? '可用' : item.status)))),
+                  h('input', { className: 'dsh-nb-check', type: 'checkbox', 'aria-label': '使用来源：' + item.title, checked: item.enabled, disabled: running || pending.setSources, onChange: event => run('setSources', { changes: [{ id: item.id, enabled: event.target.checked }] }) }))),
+                  !sources.length ? h('div', { className: 'dsh-nb-empty' }, h('p', { className: 'dsh-nb-meta' }, notebook ? '添加资料，或在「搜集构建」中描述研究目标。' : '创建笔记本，或直接描述研究目标。'), !notebook ? chip('创建笔记本', () => { setNotebookTitle(''); setDialog('create-notebook') }, { disabled: !workspace || running }) : null) : !filtered.length ? h('p', { className: 'dsh-nb-meta dsh-nb-empty' }, '没有匹配的来源。') : null),
+                h('div', { className: 'dsh-nb-foot' }, '勾选的来源用于回答和生成内容。')),
+              sourceDetailContent),
+            h('section', { className: 'dsh-nb-col is-main', 'aria-label': '研究对话' },
+              h('div', { className: 'dsh-nb-head' }, h('span', { className: 'dsh-nb-title', title: workspace?.title }, workspace?.title || '对话'), h('span', { className: 'dsh-nb-meta dsh-nb-scope' }, mode === 'sources' ? '基于 ' + selected + ' 个来源' : '可使用资料搜集工具')),
+              h('div', { className: 'dsh-nb-thread', ref: threadRef },
+                !messages.length && !research && state ? h('div', { className: 'dsh-nb-hero' }, h('span', { className: 'dsh-nb-hero-mark' }, h(ParticleWhale, { motion: ui.motion })), h('h2', null, mode === 'sources' ? '让资料，连成思路' : '从一个问题，开始研究'), h('p', { className: 'dsh-nb-meta' }, mode === 'sources' ? '从勾选来源出发，提问、比较，整理思路。' : '搜集资料、整理证据，逐步建立你的笔记本。'), h('div', { className: 'dsh-nb-suggest' }, mode === 'research' ? chip('自动构建笔记本', openResearch, { disabled: !workspace || running, 'data-action': 'hero-research' }) : null, (mode === 'sources' ? SUGGEST : ['围绕研究目标搜集资料', '读取本地资料，整理证据']).map(text => chip(text, () => { setQuestion(text); composerRef.current?.focus() }, { key: text, disabled: running })))) : null,
+                researchCard,
+                h('div', { className: 'dsh-nb-messages' }, messages.map((item, index) => h('article', { key: item.id || index, className: 'dsh-nb-message ' + item.role + (item.status === 'failed' ? ' is-failed' : '') },
+                  h('div', { className: 'dsh-nb-message-meta' }, h('span', null, item.role === 'user' ? '你' : '助手'), ['failed', 'cancelled'].includes(item.status) ? h('span', null, item.status === 'failed' ? '未完成' : '已停止') : null),
+                  h('div', { className: 'dsh-nb-message-body' }, h(CitationText, { text: item.text, sources, onOpen: viewSource })),
+                  item.role === 'assistant' && String(item.text || '').trim() && !running ? h('div', { className: 'dsh-nb-message-actions' }, menuButton('pin', '保存到笔记', async () => { if (await run('saveNote', { title: (workspace?.title || '研究') + ' · 回答笔记', body: item.text }, 'note:' + item.id)) setNotice('已保存到当前笔记本。') }, { disabled: !notebook || pending['note:' + item.id], 'data-action': 'save-answer' })) : null))),
+                !running && task?.status === 'cancelled' && !research ? h('p', { className: 'dsh-nb-meta' }, '本次运行已停止。') : null),
+              status,
+              h('form', { className: 'dsh-nb-composer', onSubmit: event => { event.preventDefault(); if (canSend) ask(question) } },
+                h('textarea', { rows: 2, ref: composerRef, 'aria-label': '发送给模型的消息', placeholder: !hasRoute ? '选择可用模型后开始…' : mode === 'sources' ? '向这些资料提问…' : '描述研究目标，或提供网址和资料路径…', value: question, onChange: event => setQuestion(event.target.value), onKeyDown: event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && !event.nativeEvent?.isComposing && event.keyCode !== 229) { event.preventDefault(); if (canSend) ask(question) } } }),
+                h('div', { className: 'dsh-nb-composer-bottom' },
+                  h('div', { className: 'dsh-nb-mode', role: 'group', 'aria-label': '工作模式' },
+                    h(SwitchTrack, { index: mode === 'sources' ? 0 : 1, count: 2, backwards: mode === 'sources' }),
+                    ['sources', 'research'].map(value => h('button', { key: value, type: 'button', className: mode === value ? 'on' : '', disabled: !workspace || running, 'aria-pressed': mode === value, onClick: () => chooseMode(value), 'data-mode': value }, value === 'sources' ? '资料问答' : '搜集构建'))),
+                  h('div', { className: 'dsh-nb-composer-trailing' },
+                    h(ModelPicker, { ...modelPickerProps, label: '对话模型', disabled: !workspace || running }),
+                    running ? chip('停止', () => run('cancel'), { className: 'dsh-nb-chip dsh-nb-stop', disabled: pending.cancel, 'data-action': 'stop' }) : h('button', { className: 'dsh-nb-send', type: 'submit', disabled: !canSend, 'aria-label': '发送' }, h(UiIcon, { kind: 'send' }))))),
+              h('div', { className: 'dsh-nb-composer-hint' }, h('span', null, mode === 'sources' ? selected ? '仅依据勾选来源' : '请先勾选可用来源' : '可搜索网页、读取资料与创建笔记本'), h('span', null, 'Shift + Enter 换行'))),
+            h('section', { className: 'dsh-nb-col is-studio', 'aria-label': 'Studio', onClick: () => { if (artifactId && activeSide !== 'studio') setActiveSide('studio') } },
+              h('div', { className: 'dsh-nb-rail' }, iconButton('right', '展开 Studio', () => togglePanel('studioCollapsed'), { 'data-action': 'expand-studio' }), h('span', null, 'Studio')),
+              h('div', { className: 'dsh-nb-pane-list' + (artifactId ? ' is-recessed' : ''), 'aria-hidden': artifactId ? 'true' : undefined },
+                h('div', { className: 'dsh-nb-head' }, h('span', { className: 'dsh-nb-title' }, 'Studio'), iconButton('right', '收起 Studio', () => togglePanel('studioCollapsed'), { className: 'dsh-nb-icon-button dsh-nb-collapse', 'data-action': 'collapse-studio' })),
+                h('div', { className: 'dsh-nb-studio' }, h('div', { className: 'dsh-nb-studio-content' },
+                  h('div', { className: 'dsh-nb-studio-grid' }, STUDIO.map(([kind, label, description]) => {
+                    const busy = Boolean(pending['generate:' + kind]) || artifacts.some(item => item.kind === kind && pendingArtifact(item))
+                    const guide = kind === 'study-guide'
+                    return h('button', {
+                      key: kind, type: 'button', className: guide ? 'dsh-nb-card dsh-nb-guide-card' : 'dsh-nb-card',
+                      'data-studio-kind': kind, 'aria-busy': busy, title: description, disabled: !notebook || !selected || !hasRoute || busy || running,
+                      onClick: async event => {
+                        const opener = event.currentTarget
+                        const result = await run('generate', { kind, prompt: question, provider: providerId, model: modelId }, 'generate:' + kind)
+                        if (result?.artifactId) openArtifact(result.artifactId, { opener })
+                      },
+                    }, guide ? h('span', { className: 'dsh-nb-guide-art', 'aria-hidden': 'true' }, h('span', { className: 'dsh-nb-guide-sheet' })) : h(StudioGlyph, { kind }), h('strong', null, label), guide ? h('small', null, description) : null)
+                  })),
+                  !notebook || !selected ? h('p', { className: 'dsh-nb-meta' }, '勾选来源后即可生成内容。') : !hasRoute ? h('p', { className: 'dsh-nb-meta' }, '选择模型后即可生成内容。') : null,
+                  h('h3', { className: 'dsh-nb-art-heading' }, '已生成', h('small', null, String(artifacts.length))),
+                  artifacts.map(item => h('button', { key: item.id, className: 'dsh-nb-art', type: 'button', 'data-artifact-id': item.id, 'data-studio-kind': item.kind, onClick: event => openArtifact(item.id, { opener: event.currentTarget }) }, h(StudioGlyph, { kind: item.kind }), h('span', { className: 'dsh-nb-art-copy' }, h('strong', null, artifactLabel(item)), h('small', null, [artifactStatus(item.status), (item.created_at || item.createdAt) && new Date(item.created_at || item.createdAt).toLocaleDateString()].filter(Boolean).join(' · '))), h('span', { className: 'dsh-nb-art-open', 'aria-hidden': 'true' }, h(UiIcon, { kind: 'chevron', size: 14 })))),
+                  !artifacts.length ? h('p', { className: 'dsh-nb-meta' }, '生成的内容会保存在这里。') : null))),
+              studioDetailContent))),
         dialog ? h(Dialog, { key: dialog, title: dialogTitle, onClose: closeDialog, content: dialogContent, error: error || taskError, busy: dialogBusy, motion: ui.motion, onStop: running ? () => run('cancel') : undefined, stopping: pending.cancel }) : null)
     }
 
