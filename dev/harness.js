@@ -163,7 +163,8 @@
     for (const [key, value] of Object.entries(props)) {
       if (SKIP.has(key) || key.startsWith('on')) continue
       if (key === 'value' && (dom.tagName === 'INPUT' || dom.tagName === 'TEXTAREA' || dom.tagName === 'SELECT')) continue
-      if (value == null || value === false) dom.removeAttribute(attrName(key))
+      if (key.startsWith('aria-') && typeof value === 'boolean') dom.setAttribute(key, String(value))
+      else if (value == null || value === false) dom.removeAttribute(attrName(key))
       else dom.setAttribute(attrName(key), value === true ? '' : String(value))
     }
     if ('disabled' in props) dom.disabled = !!props.disabled

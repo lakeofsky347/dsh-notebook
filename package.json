@@ -8,10 +8,12 @@
   "exports": {
     ".": "./src/index.js",
     "./client": "./src/client.js",
-    "./library": "./src/library.js"
+    "./library": "./src/library.js",
+    "./assets/*": "./lib/assets/*"
   },
   "files": [
     "src",
+    "lib/assets",
     "cordis.patch.yml",
     "package.json",
     "README.md",

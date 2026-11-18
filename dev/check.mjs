@@ -12,7 +12,7 @@ import { createPreviewServer } from './serve.mjs'
 const binary = process.env.CHROME_BIN || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(existsSync)
 if (!binary) throw new Error('未找到 Chrome。可用 CHROME_BIN 指定 Chrome 或 Chromium 可执行文件。')
 const userData = await mkdtemp(join(tmpdir(), 'nb-smoke-'))
-const outputDir = resolve('output/dev-smoke')
+const outputDir = resolve(process.env.DSH_NOTEBOOK_UI_OUTPUT || 'output/dev-smoke')
 await mkdir(outputDir, { recursive: true })
 const server = createPreviewServer()
 server.listen(0, '127.0.0.1')
@@ -59,12 +59,13 @@ async function input(session, selector, value) { await evaluate(session, `(() =>
 async function click(session, selector) { await evaluate(session, `document.querySelector(${JSON.stringify(selector)}).click()`); await delay(30) }
 async function select(session, selector, value) { await evaluate(session, `(() => { const node = document.querySelector(${JSON.stringify(selector)}); node.value = ${JSON.stringify(value)}; node.dispatchEvent(new Event('change', { bubbles: true })); })()`); await delay(50) }
 async function shot(session, name) { const result = await send('Page.captureScreenshot', { format: 'png' }, session); const path = join(outputDir, name + '.png'); await writeFile(path, Buffer.from(result.data, 'base64')); report.screenshots.push(path) }
-async function activityFrame(session) {
-  // Crop the indicator itself: typing cursors and other page content cannot make
-  // a static whale appear animated (or invalidate a reduced-motion comparison).
-  const clip = await evaluate(session, `(() => { const rect = document.querySelector('.dsh-nb-activity[data-activity="running"]').getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scale: 1 }; })()`)
+// Use each whale's own pixels so unrelated focus, typing and other motion
+// cannot affect the frame comparisons.
+async function visualFrame(session, selector) {
+  const clip = await evaluate(session, `(() => { const rect = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scale: 1 }; })()`)
   return (await send('Page.captureScreenshot', { format: 'png', clip }, session)).data
 }
+const activityFrame = session => visualFrame(session, '.dsh-nb-activity[data-activity="running"]')
 async function fixtureRefresh(session, expression) {
   const before = await evaluate(session, `window.__nbDev.requests.filter(item => item.op === 'state').length`)
   await evaluate(session, expression)
@@ -268,6 +269,12 @@ try {
   check('首次使用自动创建独立工作台', await evaluate(fresh, `window.__nbDev.store.workspaces.length === 1 && document.querySelector('.dsh-nb-workbench').dataset.workspaceId`))
   const narrow = await open('ready', 420, 900)
   check('窄屏不横向溢出', await evaluate(narrow, `document.documentElement.scrollWidth <= innerWidth + 1`))
+  check('窄屏页签以正确的按下状态和颜色区分当前视图', await evaluate(narrow, `(() => {
+    const tabs = document.querySelector('.dsh-nb-pane-tabs')
+    const active = tabs.querySelectorAll('[aria-pressed="true"]'), others = tabs.querySelectorAll('[aria-pressed="false"]')
+    return active.length === 1 && active[0].dataset.paneTarget === 'chat' && others.length === 2 &&
+      getComputedStyle(active[0]).backgroundColor !== getComputedStyle(others[0]).backgroundColor
+  })()`))
   await shot(narrow, 'workbench-mobile')
   await beginActivity(narrow)
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] }, narrow)
@@ -281,6 +288,28 @@ try {
   await send('Page.bringToFront', {}, motion)
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'prefers-color-scheme', value: 'dark' }] }, motion)
   check('空闲工作台没有粒子画布或持续逐帧调度', await evaluate(motion, `!document.querySelector('canvas, .dsh-nb-activity[data-activity="running"]') && window.__nbRafRequests === 0`))
+  const particle = '.dsh-nb-particle-whale'
+  await waitFor(motion, `document.querySelector('button.dsh-nb-particle-whale[data-playing="false"]')`)
+  // The nearby rotated hairlines overlap this crop. Chrome rasterizes their
+  // antialiasing slightly differently after the sprite's layer is retired.
+  // Hide only the stationary waterlines for this exact whale-pixel test.
+  await evaluate(motion, `(() => {
+    const style = document.createElement('style')
+    style.id = 'test-isolate-particle'
+    style.textContent = '.dsh-nb-hero-mark::before, .dsh-nb-hero-mark::after { visibility: hidden !important; }'
+    document.head.appendChild(style)
+  })()`)
+  const poster = await visualFrame(motion, particle)
+  await delay(180)
+  check('空态粒子鲸在点击前保持静止', poster === await visualFrame(motion, particle))
+  await click(motion, particle)
+  await waitFor(motion, `document.querySelector('.dsh-nb-particle-whale[data-playing="true"]')`)
+  const particleFrames = []
+  for (let i = 0; i < 5; i++) { particleFrames.push(await visualFrame(motion, particle)); await delay(160) }
+  check('点按粒子鲸后图集产生不同真实画面', new Set(particleFrames).size > 1)
+  await waitFor(motion, `document.querySelector('.dsh-nb-particle-whale[data-playing="false"]')`)
+  check('粒子鲸播放一次后恢复原海报且未调用 RAF', poster === await visualFrame(motion, particle) && await evaluate(motion, `window.__nbRafRequests === 0`))
+  await evaluate(motion, `document.getElementById('test-isolate-particle').remove()`)
   const idleToolbar = await evaluate(motion, `(() => { const rect = document.querySelector('.dsh-nb-toolbar').getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height } })()`)
   await beginActivity(motion)
   const frames = []
@@ -296,6 +325,10 @@ try {
   await shot(motion, 'motion-running-dark')
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }, { name: 'prefers-color-scheme', value: 'dark' }] }, motion)
   await waitFor(motion, `getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).display === 'none'`)
+  // Media queries update CSS before delivering the change event that replaces
+  // the optional playback button with the decorative poster.
+  await waitFor(motion, `document.querySelector('span.dsh-nb-particle-whale')`)
+  check('减少动态时粒子鲸保留静态海报并移除播放按钮', await evaluate(motion, `!!document.querySelector('span.dsh-nb-particle-whale[aria-hidden="true"][data-playing="false"]') && !document.querySelector('button.dsh-nb-particle-whale')`))
   const reducedFrame = await activityFrame(motion)
   await delay(450)
   check('系统减少动态时显示静态鲸尾且裁剪帧保持不变', reducedFrame === await activityFrame(motion) && await evaluate(motion, `(() => { const still = document.querySelector('.dsh-nb-whale-still'); return getComputedStyle(still).display !== 'none' && still.getBoundingClientRect().width > 0 && getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).maskImage === 'none' && window.__nbRafRequests === 0 })()`))
@@ -326,12 +359,30 @@ try {
   await evaluate(motion, `document.documentElement.style.removeProperty('--dsw-alias-bg-base'); document.documentElement.style.removeProperty('--dsw-alias-label-primary')`)
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-reduced-motion', value: 'no-preference' }] }, motion)
   await waitFor(motion, `getComputedStyle(document.querySelector('.dsh-nb-whale-animated')).display === 'none'`)
+  await waitFor(motion, `document.querySelector('span.dsh-nb-particle-whale')`)
   const forcedFrame = await activityFrame(motion)
+  check('强制配色下粒子鲸使用可见静态图形', await evaluate(motion, `(() => {
+    const whale = document.querySelector('span.dsh-nb-particle-whale[data-playing="false"]')
+    if (!whale) return false
+    const style = getComputedStyle(whale, '::before')
+    return style.maskImage !== 'none' && style.backgroundColor !== getComputedStyle(document.querySelector('.dsh-nb')).backgroundColor
+  })()`))
   await delay(450)
   check('强制配色使用可见静态鲸尾且不依赖动画遮罩', forcedFrame === await activityFrame(motion) && await evaluate(motion, `(() => { const activity = document.querySelector('.dsh-nb-activity'), still = activity.querySelector('.dsh-nb-whale-still'); return matchMedia('(forced-colors: active)').matches && getComputedStyle(still).display !== 'none' && still.getBoundingClientRect().width > 0 && getComputedStyle(activity.querySelector('.dsh-nb-whale-animated')).maskImage === 'none' && getComputedStyle(activity).color !== getComputedStyle(document.querySelector('.dsh-nb')).backgroundColor })()`))
   await evaluate(motion, `document.querySelector('[data-action="more"]').focus()`)
   check('强制配色保留键盘操作的可见焦点轮廓', await evaluate(motion, `(() => { const control = document.querySelector('[data-action="more"]'), style = getComputedStyle(control); return document.activeElement === control && control.matches(':focus-visible') && style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0 })()`))
   await shot(motion, 'motion-forced-colors')
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] }, motion)
+  check('减少透明度时阅读区与控件使用实底并保留运行状态', await evaluate(motion, `(() => {
+    const surfaces = ['.dsh-nb-toolbar', '.dsh-nb-composer', '.dsh-nb-col.is-sources', '.dsh-nb-col.is-studio']
+    return matchMedia('(prefers-reduced-transparency: reduce)').matches &&
+      surfaces.every(selector => {
+        const style = getComputedStyle(document.querySelector(selector))
+        return style.backdropFilter === 'none' && style.backgroundColor.startsWith('rgb(')
+      }) &&
+      getComputedStyle(document.querySelector('.dsh-nb')).backgroundImage === 'none' &&
+      document.querySelector('.dsh-nb-activity[data-activity="running"]')?.getAttribute('role') === 'status'
+  })()`))
   await send('Emulation.setEmulatedMedia', { features: [] }, motion)
   await click(motion, '[data-action="stop"]')
   await waitFor(motion, `!document.querySelector('.dsh-nb-activity[data-activity="running"]')`)

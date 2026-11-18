@@ -4,13 +4,15 @@ import { dirname, extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.mjs': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png' }
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.mjs': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.webp': 'image/webp' }
 export function createPreviewServer() {
   return createServer(async (request, response) => {
     try {
       const path = decodeURIComponent(new URL(request.url, 'http://localhost').pathname)
-      const file = resolve(root, '.' + (path === '/' ? '/dev/preview.html' : path))
-      if (!file.startsWith(root + sep) || path.split('/').some(part => part.startsWith('.')) || !['/dev/', '/src/'].some(prefix => path === '/' || path.startsWith(prefix))) {
+      // The standalone fixture may be mounted at / or /dev/preview.html.
+      const packageAsset = path.match(/^\/(?:dev\/)?plugins\/dsh-notebook\/assets\/([\w.-]+\.webp)$/)
+      const file = packageAsset ? resolve(root, 'lib/assets', packageAsset[1]) : resolve(root, '.' + (path === '/' ? '/dev/preview.html' : path))
+      if (!file.startsWith(root + sep) || path.split('/').some(part => part.startsWith('.')) || (!packageAsset && !['/dev/', '/src/'].some(prefix => path === '/' || path.startsWith(prefix)))) {
         response.writeHead(404); response.end('Not found'); return
       }
       const body = await readFile(file)

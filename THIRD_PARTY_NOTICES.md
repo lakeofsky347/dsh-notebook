@@ -16,6 +16,12 @@ The unmodified animation is embedded as a data URL so the notebook client works 
 
 Notebook-specific changes: React element creation, scoped CSS classes, the fixed indicator slot, accessible busy announcements, and the user motion preference. The native current-color mask and static SVG fallback are preserved for reduced motion, forced colors, and unsupported masks.
 
+## DeepSeek Harness home particle whale
+
+The decorative whale on the empty Notebook page uses artwork from `@deepseek-ai/dsh-client-ui-brand-official@0.2.2-rc.3`, copyright (c) 2026 DeepSeek, under the same MIT License. The published package includes the original `lib/assets/breach-atlas-43c5305a3d4d.webp` and the dot renderer in `src/client/home-whale/renderer.ts`. The original atlas has 137 frames and SHA-256 `6ab7c778b7085b0248525bd5640933eee2891c836ba33129a1bd6bbae80eaf63`.
+
+Notebook samples the original particle positions, sizes and opacity to make a smaller-scale silhouette. The embedded static artwork comes from frame 48. The separate `lib/assets/notebook-breach-e50678e5da35.webp` sheet contains 49 sampled frames, starting and ending at the still pose. Notebook applies its theme colors and plays one 4.08-second CSS animation on activation. The glass lighting and control styling are specific to Notebook.
+
 ```text
 MIT License
 

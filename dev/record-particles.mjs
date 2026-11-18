@@ -14,7 +14,7 @@ import { createPreviewServer } from './serve.mjs'
 // clock overrides, external fetches, or model requests are used.
 // Run: npm run preview:motion (preview:particles remains a compatible alias).
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const outputDir = resolve(root, 'output/motion')
+const outputDir = resolve(root, process.env.DSH_NOTEBOOK_MOTION_OUTPUT || 'output/motion')
 const chromeBinary = process.env.CHROME_BIN || [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser',
