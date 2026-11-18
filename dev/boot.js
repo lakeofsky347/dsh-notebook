@@ -2,6 +2,7 @@
 (function () {
   const params = new URLSearchParams(location.search)
   const scene = params.get('scene') || 'ready'
+  const streamPreview = params.get('stream') === '1' || scene === 'dive'
   let authRequired = scene === 'unauthenticated'
   const act = params.get('act') || ''
   if (params.get('chrome') === '0') document.body.classList.add('clean')
@@ -232,14 +233,32 @@
       setTimeout(() => {
         if (research.status !== 'running') return
         research.phase = 'synthesizing'
-      }, scene === 'research-slow' ? 13000 : 2300)
+        if (streamPreview) {
+          const refs = research.imported.map(item => '[' + item.sourceId + ']').join(' ')
+          const chunks = [
+            '正在汇整深海检索来源 ' + refs + ' …\n\n',
+            '• 核心脉络：已交叉核验概念边界、观测方法与主要争议点；\n',
+            '• 知识成卷：已保存 ' + research.imported.length + ' 份可溯源资料，并同步生成结构化学习指南。',
+          ]
+          const row = message(workspace, 'assistant', chunks[0], { status: 'streaming' })
+          research.__streamRow = row
+          chunks.slice(1).forEach((piece, idx) => {
+            setTimeout(() => { if (research.status === 'running') row.text += piece }, (idx + 1) * 420)
+          })
+        }
+      }, scene === 'research-slow' ? 13000 : streamPreview ? 1750 : 2300)
       setTimeout(() => {
         if (research.status !== 'running') return
         const artifact = { id: id('a'), notebook_id: notebookId, kind: 'study-guide', title: '自动研究学习指南', status: 'done', body: '【开发预览 · 自动研究学习指南】\n\n研究目标：' + prompt + '\n\n阅读路线：先理解概念，再比较方法，最后用资料验证结论。\n\n来源：' + research.imported.map(item => '[' + item.sourceId + ']').join(' '), error: '' }
         store.artifacts[notebookId].unshift(artifact)
         research.artifactId = artifact.id; research.artifactStatus = 'done'; research.status = scene === 'research-partial' ? 'partial' : 'done'; research.phase = 'completed'; research.finishedAt = now()
-        message(workspace, 'assistant', '开发预览：已保存 ' + research.imported.length + ' 个来源，并整理了学习指南。')
-      }, scene === 'research-slow' ? 15000 : 2800)
+        if (research.__streamRow) {
+          research.__streamRow.status = 'done'
+          delete research.__streamRow
+        } else {
+          message(workspace, 'assistant', '开发预览：已保存 ' + research.imported.length + ' 个来源，并整理了学习指南。')
+        }
+      }, scene === 'research-slow' ? 15000 : streamPreview ? 3400 : 2800)
       return { ok: true, research: clone(research) }
     }
     if (body.op === 'chat') {
@@ -256,6 +275,35 @@
         if (workspace.mode === 'research') message(workspace, 'assistant', '', { content: [{ type: 'tool-call', name: 'web_search' }] })
         if (workspace.mode === 'research') message(workspace, 'tool', '开发预览：正在搜索与研究目标有关的资料…', { toolName: 'search_web' })
       }, 120)
+      if (streamPreview && scene !== 'chat-error' && !text.includes('模拟失败') && scene !== 'slow') {
+        let addedId = 's1'
+        setTimeout(() => {
+          if (task.status !== 'running') return
+          if (workspace.mode === 'research') {
+            const notebookId = ensureNotebook(workspace)
+            const source = { id: id('s'), title: '深海检索 · ' + text.slice(0, 16), kind: 'url', url: 'https://example.org/deep-dive', enabled: true, status: 'ready', body: '开发预览深海检索资料。\n研究目标：' + text }
+            addedId = source.id
+            store.sources[notebookId].push(source)
+          }
+          task.phase = 'answering'
+          const chunks = [
+            '已围绕「' + text + '」潜入多源资料库完成交叉检索 [' + addedId + ']。\n\n',
+            '1. 概念锚定：梳理核心机制、指标体系与演进脉络 [s1]；\n',
+            '2. 证据归档：关键来源已收录至左侧笔记本，可随时点击引用核对原文 [s2]；\n',
+            '3. 下一步：可在右侧 Studio 一键生成学习指南、简报或自测闪卡。',
+          ]
+          const row = message(workspace, 'assistant', chunks[0], { status: 'streaming' })
+          chunks.slice(1).forEach((piece, idx) => {
+            setTimeout(() => { if (task.status === 'running') row.text += piece }, (idx + 1) * 420)
+          })
+          setTimeout(() => {
+            if (task.status !== 'running') return
+            row.status = 'done'
+            task.status = 'done'; task.phase = '完成'
+          }, chunks.length * 420 + 260)
+        }, 1450)
+        return { ok: true, task: clone(task) }
+      }
       setTimeout(() => {
         if (task.status !== 'running') return
         if (scene === 'chat-error' || text.includes('模拟失败')) { task.status = 'failed'; task.error = '开发预览：模拟模型请求失败'; return }

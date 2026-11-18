@@ -42,6 +42,38 @@ window.__ModuleLoader__.load({
       const percent = (value, divisor) => (100 * value / divisor).toFixed(5) + '%'
       return percent(index, 49) + ' { mask-position: ' + percent(index % 7, 6) + ' ' + percent(Math.floor(index / 7), 6) + '; }'
     }).join('\n')
+    const svgMaskUri = (w, h, circles) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${circles}</svg>`)
+    const PARTICLE_FIELD_MASK = svgMaskUri(260, 260, Array.from({ length: 52 }, (_, i) => {
+      const h1 = Math.abs(Math.sin((i + 1) * 127.1) * 43758.5453) % 1
+      const h2 = Math.abs(Math.sin((i + 1) * 311.7) * 24634.6345) % 1
+      const x = (h1 * 246 + 7).toFixed(1)
+      const y = (h2 * 246 + 7).toFixed(1)
+      const r = (0.75 + (i % 5) * 0.34).toFixed(2)
+      const o = (0.3 + (i % 4) * 0.2).toFixed(2)
+      return `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" fill-opacity="${o}"/>`
+    }).join(''))
+    const PARTICLE_RING_MASK = svgMaskUri(160, 160, [
+      [24, 18, 1.45, 0.92],
+      [46, 28, 1.3, 0.78],
+      [68, 38, 1.15, 0.62],
+    ].map(([radius, count, dotR, op], ringIdx) => Array.from({ length: count }, (_, idx) => {
+      const a = (idx / count) * Math.PI * 2 + ringIdx * 0.24
+      const x = (80 + Math.cos(a) * radius).toFixed(1)
+      const y = (80 + Math.sin(a) * radius).toFixed(1)
+      const r = (dotR * (0.82 + (idx % 3) * 0.18)).toFixed(2)
+      return `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" fill-opacity="${op}"/>`
+    }).join('')).join(''))
+    const PARTICLE_SPLASH_MASK = svgMaskUri(240, 150, Array.from({ length: 46 }, (_, i) => {
+      const side = i % 2 === 0 ? -1 : 1
+      const step = Math.floor(i / 2) / 23
+      const spread = 16 + step * 92
+      const lift = Math.sin(step * Math.PI) * (54 + (i % 3) * 12)
+      const x = (120 + side * spread).toFixed(1)
+      const y = (114 - lift + (i % 4) * 3.5).toFixed(1)
+      const r = (1.05 + (1 - step) * 1.45).toFixed(2)
+      const o = (0.95 - step * 0.52).toFixed(2)
+      return `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" fill-opacity="${o}"/>`
+    }).join(''))
     const PANEL_CSS = `
 @property --nb-aura-angle {
   syntax: '<angle>';
@@ -61,8 +93,8 @@ window.__ModuleLoader__.load({
   --nb-accent: var(--dsw-alias-link, var(--nb-fallback-accent));
   --nb-accent-ink: color-mix(in srgb, var(--nb-accent) 78%, var(--nb-fg));
   --nb-accent-soft: color-mix(in srgb, var(--nb-accent) 13%, transparent);
-  --nb-aurora-sky: color-mix(in srgb, var(--nb-accent) 56%, #52c7f7);
-  --nb-aurora-indigo: color-mix(in srgb, var(--nb-accent) 52%, #8474f5);
+  --nb-aurora-sky: color-mix(in srgb, var(--nb-accent) 58%, #1e4db7);
+  --nb-aurora-indigo: color-mix(in srgb, var(--nb-accent) 44%, #0d224a);
   --nb-danger: var(--dsw-alias-state-error-primary, var(--nb-fallback-danger));
   --nb-canvas: var(--nb-bg);
   --nb-island: var(--nb-panel);
@@ -121,9 +153,236 @@ window.__ModuleLoader__.load({
 .dsh-nb ::selection { background: color-mix(in srgb, var(--nb-accent) 22%, transparent); color: var(--nb-fg); }
 .dsh-nb svg { flex: none; }
 .dsh-nb [hidden] { display: none !important; }
-.dsh-nb-stage { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; background-color: var(--nb-canvas); }
+.dsh-nb-stage {
+  position: relative; isolation: isolate; flex: 1; min-height: 0; min-width: 0;
+  display: flex; flex-direction: column; background-color: var(--nb-canvas);
+  transition: background-color 680ms var(--nb-ease-spatial);
+}
 .dsh-nb-meta { font-size: 12px; line-height: 1.55; color: var(--nb-muted); overflow-wrap: anywhere; }
 .dsh-nb-empty { padding: 18px 10px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+
+/* Gemini-Inspired Navy/Black/Deep-Blue Working Aurora & Oceanic Particle Field */
+.dsh-nb-atmosphere { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+.dsh-nb-abyss, .dsh-nb-surface-bloom, .dsh-nb-ambient-whale-wrap {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden; opacity: 0;
+}
+.dsh-nb-abyss { transition: opacity 720ms var(--nb-ease-spatial); }
+.dsh-nb-aurora-veil, .dsh-nb-aurora-edge, .dsh-nb-aurora-particles { position: absolute; inset: -16% -12%; pointer-events: none; }
+.dsh-nb-ambient-whale-wrap { display: grid; place-items: center; }
+.dsh-nb-ambient-whale-anchor {
+  position: relative; width: 256px; height: 152px; transform: translateY(-6%);
+  display: grid; place-items: center;
+}
+.dsh-nb-ambient-whale {
+  position: relative; display: block; width: 214px; aspect-ratio: 13 / 7;
+  color: #3b76e6; filter: drop-shadow(0 12px 28px rgba(24, 63, 133, .55));
+}
+.dsh-nb-ambient-whale .dsh-nb-particle-poster { display: block; width: 100%; height: 100%; object-fit: contain; }
+@supports (mask-image: url('')) {
+  .dsh-nb-ambient-whale .dsh-nb-particle-poster { display: none; }
+  .dsh-nb-ambient-whale::before, .dsh-nb-ambient-whale::after {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(135deg, #8cb8ff 8%, #2c66d4 52%, #0e244d 96%);
+  }
+  .dsh-nb-ambient-whale::before { content: ''; mask: url('${PARTICLE_POSTER}') center / 100% 100% no-repeat; }
+}
+.dsh-nb-particle-splash, .dsh-nb-particle-ripple {
+  position: absolute; pointer-events: none; opacity: 0;
+}
+.dsh-nb-particle-splash {
+  width: 248px; height: 154px; bottom: 8px; left: 50%; translate: -50% 0;
+  background: radial-gradient(circle at 50% 72%, #b8d4ff 0%, #467ee5 54%, #153673 100%);
+  -webkit-mask: url("${PARTICLE_SPLASH_MASK}") center / 100% 100% no-repeat;
+  mask: url("${PARTICLE_SPLASH_MASK}") center / 100% 100% no-repeat;
+}
+.dsh-nb-particle-ripple {
+  width: 220px; height: 68px; bottom: 4px; left: 50%; translate: -50% 0;
+  background: radial-gradient(ellipse at center, #8cb8ff 0%, #2c66d4 62%, transparent 100%);
+  -webkit-mask: url("${PARTICLE_RING_MASK}") center / 100% 100% no-repeat;
+  mask: url("${PARTICLE_RING_MASK}") center / 100% 100% no-repeat;
+}
+@media (prefers-reduced-motion: no-preference) and (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .dsh-nb-col,
+  .dsh-nb[data-motion=enabled] .dsh-nb-inpane,
+  .dsh-nb[data-motion=enabled] .dsh-nb-toolbar {
+    transition: background-color 720ms var(--nb-ease-spatial), border-color 720ms var(--nb-ease-spatial), box-shadow 720ms var(--nb-ease-spatial), filter 720ms var(--nb-ease-spatial);
+  }
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-stage {
+    --nb-canvas: color-mix(in srgb, #03060d 84%, var(--nb-bg));
+    --nb-island: color-mix(in srgb, #070e1d 82%, var(--nb-panel));
+    --nb-tile: color-mix(in srgb, #0d1c38 72%, var(--nb-island));
+    --nb-composer-bg: color-mix(in srgb, #09152b 84%, var(--nb-island));
+    --nb-hairline: color-mix(in srgb, #2558b8 30%, var(--nb-line));
+    --nb-island-shadow: 0 16px 42px -10px rgba(1, 4, 12, .76), inset 0 1px 0 rgba(91, 141, 239, .1);
+  }
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-col.is-main {
+    border-color: color-mix(in srgb, #2b63c9 40%, var(--nb-hairline));
+    box-shadow: 0 18px 46px -12px rgba(2, 8, 22, .82), 0 0 40px -14px rgba(28, 74, 166, .34);
+  }
+  @media (prefers-color-scheme: light) {
+    .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-stage {
+      --nb-canvas: color-mix(in srgb, #a9bbd6 76%, var(--nb-bg));
+      --nb-island: color-mix(in srgb, #c2d2e9 78%, #ffffff);
+      --nb-tile: color-mix(in srgb, #b0c4e2 70%, var(--nb-island));
+      --nb-composer-bg: color-mix(in srgb, #cedcf0 82%, #ffffff);
+      --nb-hairline: color-mix(in srgb, #183f85 28%, var(--nb-line));
+      --nb-island-shadow: 0 12px 32px -12px rgba(8, 24, 56, .26), inset 0 1px 0 rgba(255, 255, 255, .48);
+    }
+  }
+  :root[data-theme=light] .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-stage,
+  .light .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-stage {
+    --nb-canvas: color-mix(in srgb, #a9bbd6 76%, var(--nb-bg));
+    --nb-island: color-mix(in srgb, #c2d2e9 78%, #ffffff);
+    --nb-tile: color-mix(in srgb, #b0c4e2 70%, var(--nb-island));
+    --nb-composer-bg: color-mix(in srgb, #cedcf0 82%, #ffffff);
+    --nb-hairline: color-mix(in srgb, #183f85 28%, var(--nb-line));
+    --nb-island-shadow: 0 12px 32px -12px rgba(8, 24, 56, .26), inset 0 1px 0 rgba(255, 255, 255, .48);
+  }
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-abyss {
+    opacity: 1;
+    background: radial-gradient(120% 92% at 50% 42%, rgba(8, 20, 46, .06) 24%, rgba(6, 14, 32, .26) 68%, rgba(2, 5, 13, .54) 100%);
+  }
+  @media (prefers-color-scheme: light) {
+    .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-abyss {
+      background: radial-gradient(120% 92% at 50% 42%, rgba(15, 37, 78, .06) 26%, rgba(10, 26, 58, .18) 70%, rgba(5, 14, 34, .34) 100%);
+    }
+  }
+  :root[data-theme=light] .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-abyss,
+  .light .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-abyss {
+    background: radial-gradient(120% 92% at 50% 42%, rgba(15, 37, 78, .06) 26%, rgba(10, 26, 58, .18) 70%, rgba(5, 14, 34, .34) 100%);
+  }
+  /* Gemini-style morphing perimeter & deep-sea aurora clouds (Navy / Black / Deep-Blue) */
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-aurora-veil {
+    background:
+      radial-gradient(48% 40% at 20% 22%, rgba(32, 82, 182, .44), transparent 74%),
+      radial-gradient(52% 44% at 82% 26%, rgba(18, 48, 112, .48), transparent 76%),
+      radial-gradient(56% 46% at 50% 88%, rgba(44, 104, 218, .40), transparent 74%),
+      radial-gradient(42% 38% at 14% 82%, rgba(12, 30, 70, .50), transparent 72%);
+    filter: blur(26px);
+    animation: dsh-nb-aurora-morph 7.2s ease-in-out infinite alternate;
+  }
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-aurora-edge {
+    inset: 48px 0 0 0;
+    background: conic-gradient(from var(--nb-aura-angle) at 50% 52%, rgba(3, 6, 14, .08) 0deg, rgba(32, 84, 186, .38) 64deg, rgba(12, 30, 68, .16) 136deg, rgba(50, 112, 230, .36) 212deg, rgba(9, 22, 52, .14) 288deg, rgba(3, 6, 14, .08) 360deg);
+    -webkit-mask: radial-gradient(74% 68% at 50% 50%, transparent 42%, rgba(0, 0, 0, .62) 74%, #000 100%);
+    mask: radial-gradient(74% 68% at 50% 50%, transparent 42%, rgba(0, 0, 0, .62) 74%, #000 100%);
+    animation: dsh-nb-spin-aura 8.8s linear infinite;
+  }
+  /* Dual-parallax stippled oceanic particle currents matching DSH particle whale */
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-aurora-particles::before,
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-aurora-particles::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+  }
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-aurora-particles::before {
+    background:
+      radial-gradient(62% 54% at 34% 38%, rgba(140, 184, 255, .72), rgba(38, 94, 202, .45) 56%, rgba(14, 34, 76, .18) 100%);
+    -webkit-mask: url("${PARTICLE_FIELD_MASK}") 0 0 / 260px 260px repeat;
+    mask: url("${PARTICLE_FIELD_MASK}") 0 0 / 260px 260px repeat;
+    animation: dsh-nb-particle-drift-a 12s linear infinite;
+  }
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-aurora-particles::after {
+    background:
+      radial-gradient(60% 52% at 68% 64%, rgba(168, 204, 255, .64), rgba(28, 74, 168, .38) 58%, transparent 96%);
+    -webkit-mask: url("${PARTICLE_FIELD_MASK}") 110px 70px / 340px 340px repeat;
+    mask: url("${PARTICLE_FIELD_MASK}") 110px 70px / 340px 340px repeat;
+    animation: dsh-nb-particle-drift-b 16s linear infinite;
+  }
+  /* Unboxed ambient Particle Whale dive & breach (zero layout card in chat!) */
+  .dsh-nb[data-motion=enabled][data-dive=diving] .dsh-nb-ambient-whale-wrap,
+  .dsh-nb[data-motion=enabled][data-dive=surfacing] .dsh-nb-ambient-whale-wrap {
+    opacity: 1;
+  }
+  .dsh-nb[data-motion=enabled][data-dive=diving] .dsh-nb-ambient-whale {
+    animation: dsh-nb-whale-plunge 1120ms cubic-bezier(.22, .86, .3, 1) both;
+  }
+  .dsh-nb[data-motion=enabled][data-dive=diving] .dsh-nb-particle-splash {
+    animation: dsh-nb-particle-spray 1080ms cubic-bezier(.16, 1, .3, 1) both;
+  }
+  .dsh-nb[data-motion=enabled][data-dive=diving] .dsh-nb-particle-ripple {
+    animation: dsh-nb-particle-ring-out 1100ms var(--nb-ease-spatial) both;
+  }
+  @supports (mask-image: url('')) {
+    .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=surfacing]) .dsh-nb-ambient-whale::before { visibility: hidden; }
+    .dsh-nb[data-motion=enabled][data-dive=diving] .dsh-nb-ambient-whale::after {
+      content: ''; mask: url('${particleAtlas}') left top / 700% 700% no-repeat;
+      animation: dsh-nb-breach 1120ms step-end reverse both;
+    }
+    .dsh-nb[data-motion=enabled][data-dive=surfacing] .dsh-nb-ambient-whale::after {
+      content: ''; mask: url('${particleAtlas}') left top / 700% 700% no-repeat;
+      animation: dsh-nb-breach 1800ms step-end both;
+    }
+  }
+  .dsh-nb[data-motion=enabled][data-dive=surfacing] .dsh-nb-ambient-whale {
+    animation: dsh-nb-whale-breach-up 1800ms var(--nb-ease-spatial) both;
+  }
+  .dsh-nb[data-motion=enabled][data-dive=surfacing] .dsh-nb-particle-splash {
+    animation: dsh-nb-particle-breach-spray 1620ms var(--nb-ease-spatial) both;
+  }
+  .dsh-nb[data-motion=enabled][data-dive=surfacing] .dsh-nb-particle-ripple {
+    animation: dsh-nb-particle-ring-out 1650ms var(--nb-ease-spatial) both;
+  }
+  .dsh-nb[data-motion=enabled][data-dive=surfacing] .dsh-nb-surface-bloom {
+    background:
+      radial-gradient(88% 60% at 50% 18%, rgba(140, 184, 255, .28), rgba(36, 90, 194, .12) 52%, transparent 84%),
+      linear-gradient(180deg, rgba(220, 234, 255, .14), transparent 58%);
+    animation: dsh-nb-dawn-bloom 1820ms var(--nb-ease-spatial) both;
+  }
+  .dsh-nb[data-motion=enabled][data-dive=surfacing] .dsh-nb-grid {
+    animation: dsh-nb-grid-brighten 1820ms var(--nb-ease-spatial) both;
+  }
+}
+@keyframes dsh-nb-aurora-morph {
+  0% { transform: translate3d(-2.5%, -1.8%, 0) scale(1) rotate(-1.5deg); opacity: .82; }
+  50% { opacity: 1; }
+  100% { transform: translate3d(2.8%, 2.1%, 0) scale(1.08) rotate(2deg); opacity: .9; }
+}
+@keyframes dsh-nb-particle-drift-a {
+  from { transform: translate3d(0, 0, 0); opacity: .72; }
+  50% { opacity: .96; }
+  to { transform: translate3d(-42px, -105px, 0); opacity: .72; }
+}
+@keyframes dsh-nb-particle-drift-b {
+  from { transform: translate3d(0, 0, 0); opacity: .58; }
+  50% { opacity: .88; }
+  to { transform: translate3d(38px, -145px, 0); opacity: .58; }
+}
+@keyframes dsh-nb-whale-plunge {
+  0% { opacity: .96; transform: translate3d(22px, -24px, 0) rotate(10deg) scale(1.02); }
+  28% { opacity: 1; transform: translate3d(4px, -34px, 0) rotate(-8deg) scale(1.06); }
+  68% { opacity: .88; transform: translate3d(-18px, 26px, 0) rotate(-36deg) scale(.9); }
+  100% { opacity: 0; transform: translate3d(-34px, 84px, 0) rotate(-46deg) scale(.68); }
+}
+@keyframes dsh-nb-whale-breach-up {
+  0% { opacity: 0; transform: translate3d(28px, 76px, 0) rotate(32deg) scale(.72); }
+  36% { opacity: .96; transform: translate3d(-2px, -18px, 0) rotate(8deg) scale(1.06); filter: drop-shadow(0 14px 32px rgba(70, 126, 229, .62)); }
+  72% { opacity: .78; transform: translate3d(-12px, -6px, 0) rotate(-2deg) scale(1); }
+  100% { opacity: 0; transform: translate3d(-18px, -14px, 0) scale(.95); }
+}
+@keyframes dsh-nb-particle-spray {
+  0%, 22% { opacity: 0; transform: translateY(18px) scale(.42); }
+  54% { opacity: .96; transform: translateY(-8px) scale(1.08); }
+  100% { opacity: 0; transform: translateY(6px) scale(1.32); }
+}
+@keyframes dsh-nb-particle-breach-spray {
+  0%, 10% { opacity: 0; transform: translateY(16px) scale(.46); }
+  38% { opacity: .92; transform: translateY(-12px) scale(1.12); }
+  90%, 100% { opacity: 0; transform: translateY(4px) scale(1.34); }
+}
+@keyframes dsh-nb-particle-ring-out {
+  0%, 20% { opacity: 0; transform: scale(.32); }
+  52% { opacity: .92; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1.62); }
+}
+@keyframes dsh-nb-dawn-bloom {
+  0% { opacity: 0; transform: translateY(12px) scale(1.02); }
+  28% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(1); }
+}
+@keyframes dsh-nb-grid-brighten {
+  0% { filter: brightness(.96); }
+  34% { filter: brightness(1.09) saturate(1.05); }
+  100% { filter: brightness(1) saturate(1); }
+}
 
 /* Buttons & Quiet Pills */
 .dsh-nb button.dsh-nb-chip {
@@ -157,7 +416,7 @@ window.__ModuleLoader__.load({
 
 /* Seamless Recessed Toolbar */
 .dsh-nb-toolbar {
-  flex: none; min-height: 52px; display: flex; align-items: center; gap: 10px;
+  position: relative; z-index: 5; flex: none; min-height: 52px; display: flex; align-items: center; gap: 10px;
   padding: 8px 16px 4px; background-color: var(--nb-canvas);
 }
 .dsh-nb-toolbar-brand {
@@ -389,7 +648,16 @@ window.__ModuleLoader__.load({
 .dsh-nb-source {
   display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 12px;
   border: 1px solid transparent;
-  transition: background-color 200ms var(--nb-ease-spatial), transform 220ms var(--nb-ease-spatial);
+  transition: background-color 200ms var(--nb-ease-spatial), transform 220ms var(--nb-ease-spatial), border-color 240ms ease;
+}
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep]) .dsh-nb-source {
+    animation: dsh-nb-source-ripple 580ms var(--nb-ease-spatial) both;
+  }
+}
+@keyframes dsh-nb-source-ripple {
+  0% { opacity: 0; transform: translateY(8px) scale(.98); background-color: color-mix(in srgb, #2558b8 24%, transparent); border-color: color-mix(in srgb, #3b76e6 44%, transparent); }
+  100% { opacity: 1; transform: none; }
 }
 .dsh-nb-source:hover { background: var(--nb-tile); }
 .dsh-nb-source.is-active { background: color-mix(in srgb, var(--nb-accent) 9%, var(--nb-island)); border-color: color-mix(in srgb, var(--nb-accent) 22%, transparent); }
@@ -423,6 +691,7 @@ window.__ModuleLoader__.load({
 @media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
   .dsh-nb[data-motion=enabled] .dsh-nb-hero > :not(.dsh-nb-hero-mark) { animation: dsh-nb-materialize 460ms var(--nb-ease-spatial) both; }
   .dsh-nb[data-motion=enabled] .dsh-nb-hero > .dsh-nb-suggest { animation-delay: 65ms; }
+  .dsh-nb[data-motion=enabled]:is([data-dive=diving], [data-dive=deep], [data-dive=surfacing]) .dsh-nb-hero-mark { opacity: 0; pointer-events: none; }
 }
 .dsh-nb-hero-mark { position: relative; display: grid; place-items: center; isolation: isolate; margin: 0 auto 14px; width: min(296px, 100%); height: 134px; color: var(--nb-accent); }
 .dsh-nb-hero h2 { font-size: clamp(22px, 2.2cqi, 28px); line-height: 1.36; font-weight: 560; letter-spacing: -.025em; margin: 6px 0 8px; }
@@ -453,14 +722,162 @@ window.__ModuleLoader__.load({
   width: fit-content; max-width: 86%; margin-left: auto;
 }
 .dsh-nb-message.user .dsh-nb-message-meta { display: none; }
-.dsh-nb-message.assistant { position: relative; padding-left: 0; }
-.dsh-nb-message-meta { display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 550; color: var(--nb-muted); margin-bottom: 7px; }
-.dsh-nb-message.assistant .dsh-nb-message-meta span:first-child { color: var(--nb-accent-ink); }
-.dsh-nb-message-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--dsh-content-font-size, 14px); line-height: calc(25px + var(--dsh-content-font-delta, 0px)); }
+.dsh-nb-message.assistant {
+  position: relative; isolation: isolate; padding-left: 0;
+  transition: padding 320ms var(--nb-ease-spatial), background-color 320ms ease;
+}
+.dsh-nb-message-meta { position: relative; z-index: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11.5px; font-weight: 550; color: var(--nb-muted); margin-bottom: 7px; }
+.dsh-nb-message.assistant .dsh-nb-message-meta > span:first-child { color: var(--nb-accent-ink); }
+.dsh-nb-message-body { position: relative; z-index: 1; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--dsh-content-font-size, 14px); line-height: calc(25px + var(--dsh-content-font-delta, 0px)); }
 .dsh-nb-message.is-failed .dsh-nb-message-body { color: var(--nb-danger); }
-.dsh-nb-message-actions { margin-top: 8px; opacity: .76; transition: opacity 180ms var(--nb-ease); }
+.dsh-nb-message-actions { position: relative; z-index: 1; margin-top: 8px; opacity: .76; transition: opacity 180ms var(--nb-ease); }
 .dsh-nb-message.assistant:hover .dsh-nb-message-actions, .dsh-nb-message-actions:focus-within { opacity: 1; }
 .dsh-nb-message-actions .dsh-nb-quiet { color: var(--nb-muted); font-size: 11px; padding: 4px 9px; min-height: 26px; }
+
+/* Water-Wave & Particle-Sonar Propagation Streaming Output (Navy / Black / Deep-Blue, Zero Lines) */
+.dsh-nb-stream-brand {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2.5px 9px 2.5px 7px;
+  border-radius: 999px; font-size: 10.5px; font-weight: 560; letter-spacing: .04em;
+  color: color-mix(in srgb, var(--nb-accent-ink) 88%, #5b8def);
+  background: color-mix(in srgb, #142f63 22%, var(--nb-tile));
+  border: 1px solid color-mix(in srgb, #2558b8 24%, transparent);
+  opacity: .74; transition: opacity 220ms ease, background-color 220ms ease;
+}
+.dsh-nb-message.assistant:hover .dsh-nb-stream-brand,
+.dsh-nb-stream-brand.is-live { opacity: 1; }
+.dsh-nb-stream-brand.is-live {
+  background: radial-gradient(120% 140% at 15% 50%, color-mix(in srgb, #1b4699 36%, var(--nb-tile)), color-mix(in srgb, #0a1936 52%, var(--nb-tile)));
+  border-color: color-mix(in srgb, #3b76e6 42%, transparent);
+  box-shadow: 0 4px 16px -4px rgba(18, 48, 108, .48);
+}
+.dsh-nb-stream-brand::after { content: attr(data-slogan); }
+.dsh-nb-stream-brand.is-live::after {
+  background: linear-gradient(95deg, #8cb8ff 8%, #dce8ff 46%, #4c82e8 84%, #8cb8ff);
+  background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: dsh-nb-slogan-sheen 2.6s linear infinite;
+}
+@media (prefers-color-scheme: light) {
+  .dsh-nb-stream-brand.is-live::after {
+    background: linear-gradient(95deg, #0f254e 8%, #1e4db7 48%, #102a5c 86%, #0f254e);
+    background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+:root[data-theme=light] .dsh-nb-stream-brand.is-live::after, .light .dsh-nb-stream-brand.is-live::after {
+  background: linear-gradient(95deg, #0f254e 8%, #1e4db7 48%, #102a5c 86%, #0f254e);
+  background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+@keyframes dsh-nb-slogan-sheen { to { background-position: -220% 50%; } }
+.dsh-nb-brand-dots {
+  position: relative; width: 12px; height: 12px; display: inline-grid; place-items: center; flex: none;
+}
+.dsh-nb-brand-dots::before {
+  content: ''; width: 4px; height: 4px; border-radius: 50%; background: #5b8def;
+  box-shadow: 0 0 6px rgba(91, 141, 239, .8);
+}
+.dsh-nb-brand-dots::after {
+  content: ''; position: absolute; inset: -2px;
+  background: #7eb0ff;
+  -webkit-mask: url("${PARTICLE_RING_MASK}") center / 100% 100% no-repeat;
+  mask: url("${PARTICLE_RING_MASK}") center / 100% 100% no-repeat;
+  opacity: .55;
+}
+.dsh-nb-stream-brand.is-live .dsh-nb-brand-dots::after {
+  animation: dsh-nb-sonar-dot-pulse 1.6s var(--nb-ease-spatial) infinite;
+}
+.dsh-nb-stream-field { display: none; }
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .dsh-nb-message.assistant.is-streaming {
+    padding: 13px 16px 15px; border-radius: 18px;
+    background:
+      radial-gradient(90% 120% at 12% 18%, color-mix(in srgb, #183f85 24%, transparent), transparent 72%),
+      color-mix(in srgb, #0a1833 42%, var(--nb-tile));
+    box-shadow: 0 12px 30px -14px rgba(5, 14, 34, .56);
+  }
+  @media (prefers-color-scheme: light) {
+    .dsh-nb[data-motion=enabled] .dsh-nb-message.assistant.is-streaming {
+      background:
+        radial-gradient(90% 120% at 12% 18%, rgba(28, 74, 168, .12), transparent 72%),
+        color-mix(in srgb, #183f85 8%, var(--nb-island));
+      box-shadow: 0 10px 26px -14px rgba(10, 28, 68, .18);
+    }
+    .dsh-nb[data-motion=enabled] .dsh-nb-wave-seg {
+      animation-name: dsh-nb-wave-text-light;
+    }
+  }
+  :root[data-theme=light] .dsh-nb[data-motion=enabled] .dsh-nb-message.assistant.is-streaming,
+  .light .dsh-nb[data-motion=enabled] .dsh-nb-message.assistant.is-streaming {
+    background:
+      radial-gradient(90% 120% at 12% 18%, rgba(28, 74, 168, .12), transparent 72%),
+      color-mix(in srgb, #183f85 8%, var(--nb-island));
+    box-shadow: 0 10px 26px -14px rgba(10, 28, 68, .18);
+  }
+  :root[data-theme=light] .dsh-nb[data-motion=enabled] .dsh-nb-wave-seg,
+  .light .dsh-nb[data-motion=enabled] .dsh-nb-wave-seg {
+    animation-name: dsh-nb-wave-text-light;
+  }
+  .dsh-nb[data-motion=enabled] .dsh-nb-message.assistant.is-streaming .dsh-nb-stream-field {
+    display: block; position: absolute; inset: 0; border-radius: inherit; overflow: hidden; z-index: 0; pointer-events: none;
+  }
+  /* Concentric water-wave ripple + stippled particle sonar wavefronts */
+  .dsh-nb-sonar-wave {
+    position: absolute; left: 26px; top: 24px; width: 240px; height: 240px; translate: -50% -50%;
+    border-radius: 50%; opacity: 0; pointer-events: none;
+    background: radial-gradient(circle, transparent 36%, rgba(30, 77, 183, .22) 52%, rgba(91, 141, 239, .18) 60%, rgba(12, 31, 68, .12) 68%, transparent 74%);
+    animation: dsh-nb-water-sonar 2.7s cubic-bezier(.16, 1, .3, 1) infinite;
+  }
+  .dsh-nb-sonar-wave::after {
+    content: ''; position: absolute; inset: 8%;
+    background: radial-gradient(circle, #9ec5ff 0%, #3b76e6 65%, #153673 100%);
+    -webkit-mask: url("${PARTICLE_RING_MASK}") center / 100% 100% no-repeat;
+    mask: url("${PARTICLE_RING_MASK}") center / 100% 100% no-repeat;
+    opacity: .88;
+  }
+  .dsh-nb-sonar-wave.is-w2 { animation-delay: .9s; }
+  .dsh-nb-sonar-wave.is-w3 { animation-delay: 1.8s; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-wave-seg {
+    animation: dsh-nb-wave-text 560ms var(--nb-ease-spatial) both;
+  }
+}
+@keyframes dsh-nb-water-sonar {
+  0% { opacity: 0; transform: scale(.16); }
+  18% { opacity: .95; }
+  100% { opacity: 0; transform: scale(2.85); }
+}
+@keyframes dsh-nb-wave-text {
+  0% { opacity: 0; color: #9ec5ff; text-shadow: 0 0 14px rgba(59, 118, 230, .75); filter: blur(2.5px); }
+  42% { opacity: 1; color: #bfd7ff; text-shadow: 0 0 8px rgba(30, 77, 183, .45); filter: blur(0); }
+  100% { opacity: 1; color: inherit; text-shadow: none; filter: blur(0); }
+}
+@keyframes dsh-nb-wave-text-light {
+  0% { opacity: 0; color: #1d4ed8; text-shadow: 0 0 10px rgba(30, 77, 183, .38); filter: blur(2px); }
+  42% { opacity: 1; color: #153673; text-shadow: 0 0 6px rgba(30, 77, 183, .22); filter: blur(0); }
+  100% { opacity: 1; color: inherit; text-shadow: none; filter: blur(0); }
+}
+.dsh-nb-sonar-cursor {
+  position: relative; display: inline-grid; place-items: center;
+  width: 20px; height: 20px; margin-left: 5px; vertical-align: -4px; pointer-events: none;
+}
+.dsh-nb-sonar-core {
+  width: 5px; height: 5px; border-radius: 50%; background: #8cb8ff;
+  box-shadow: 0 0 10px 2px rgba(59, 118, 230, .85);
+  animation: dsh-nb-core-breathe 1.3s ease-in-out infinite;
+}
+.dsh-nb-sonar-dots {
+  position: absolute; inset: -3px;
+  background: radial-gradient(circle, #b8d4ff, #2c66d4);
+  -webkit-mask: url("${PARTICLE_RING_MASK}") center / 100% 100% no-repeat;
+  mask: url("${PARTICLE_RING_MASK}") center / 100% 100% no-repeat;
+  animation: dsh-nb-sonar-dot-pulse 1.5s cubic-bezier(.16, 1, .3, 1) infinite;
+}
+.dsh-nb-sonar-dots.is-d2 { animation-delay: .75s; }
+@keyframes dsh-nb-core-breathe {
+  0%, 100% { transform: scale(.85); opacity: .78; }
+  50% { transform: scale(1.25); opacity: 1; }
+}
+@keyframes dsh-nb-sonar-dot-pulse {
+  0% { opacity: .95; transform: scale(.35); }
+  100% { opacity: 0; transform: scale(1.55); }
+}
 
 /* Inline Numbered Citation Pills with Tactile Shockwave */
 .dsh-nb button.dsh-nb-citation {
@@ -481,14 +898,24 @@ window.__ModuleLoader__.load({
 
 /* Auto-Research Card & Smooth Accordion Details */
 .dsh-nb-research {
+  position: relative; overflow: hidden;
   border: 1px solid var(--nb-hairline); border-radius: 16px;
   padding: 14px 16px; margin-block: 4px 20px; display: grid; gap: 10px;
   background: var(--nb-tile);
   animation: dsh-nb-materialize 440ms var(--nb-ease-spatial) both;
 }
 .dsh-nb-research.is-running {
-  border-color: color-mix(in srgb, var(--nb-accent) 40%, transparent);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--nb-accent) 7%, var(--nb-tile)), var(--nb-tile));
+  border-color: color-mix(in srgb, #2c66d4 44%, transparent);
+  background: radial-gradient(120% 120% at 10% 10%, color-mix(in srgb, #173c80 22%, var(--nb-tile)), var(--nb-tile));
+  box-shadow: 0 10px 28px -12px rgba(8, 24, 58, .52);
+}
+.dsh-nb-research[data-slogan]::before {
+  content: attr(data-slogan);
+  justify-self: start; font-size: 10.5px; font-weight: 580; letter-spacing: .06em;
+  padding: 2px 8px; border-radius: 999px;
+  color: color-mix(in srgb, var(--nb-accent-ink) 88%, #5b8def);
+  background: color-mix(in srgb, #142f63 22%, var(--nb-island));
+  border: 1px solid color-mix(in srgb, #2c66d4 28%, transparent);
 }
 .dsh-nb-research-goal { font-size: 13px; line-height: 1.7; color: var(--nb-fg); white-space: pre-wrap; overflow-wrap: anywhere; }
 .dsh-nb-research-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; font-size: 13px; }
@@ -529,7 +956,7 @@ window.__ModuleLoader__.load({
 @media (prefers-reduced-motion: no-preference) and (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
   .dsh-nb[data-motion=enabled] .dsh-nb-composer::after {
     content: ''; position: absolute; inset: -1.5px; border-radius: 25.5px; padding: 2px;
-    background: conic-gradient(from var(--nb-aura-angle), transparent 6%, var(--nb-accent) 32%, var(--nb-aurora-sky) 50%, var(--nb-aurora-indigo) 68%, transparent 88%);
+    background: conic-gradient(from var(--nb-aura-angle), rgba(6, 14, 32, .15) 4%, #14336e 26%, #2c66d4 48%, #7eb0ff 56%, #183f85 74%, rgba(6, 14, 32, .15) 94%);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor; mask-composite: exclude;
     opacity: 0; pointer-events: none;
@@ -870,6 +1297,7 @@ window.__ModuleLoader__.load({
 }
 @media (forced-colors: active), (prefers-reduced-transparency: reduce) {
   .dsh-nb { background-image: none !important; }
+  .dsh-nb-abyss, .dsh-nb-surface-bloom, .dsh-nb-ambient-whale-wrap, .dsh-nb-stream-field { display: none !important; }
   .dsh-nb-toolbar, .dsh-nb-composer, .dsh-nb-col, .dsh-nb-inpane, .dsh-nb-dialog, .dsh-nb-model-list {
     backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
   }
@@ -878,9 +1306,14 @@ window.__ModuleLoader__.load({
   .dsh-nb-composer::after { display: none !important; }
   .dsh-nb button.dsh-nb-chip.primary { background: var(--nb-island); }
 }
-@media (prefers-reduced-motion: reduce) { .dsh-nb *, .dsh-nb *::before, .dsh-nb *::after { animation: none !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) {
+  .dsh-nb *, .dsh-nb *::before, .dsh-nb *::after { animation: none !important; transition: none !important; }
+  .dsh-nb-abyss, .dsh-nb-surface-bloom, .dsh-nb-ambient-whale-wrap, .dsh-nb-stream-field, .dsh-nb-sonar-cursor { display: none !important; }
+}
 .dsh-nb[data-motion=static] *, .dsh-nb[data-motion=static] *::before, .dsh-nb[data-motion=static] *::after { animation: none !important; transition: none !important; }
+.dsh-nb[data-motion=static] :is(.dsh-nb-abyss, .dsh-nb-surface-bloom, .dsh-nb-ambient-whale-wrap, .dsh-nb-stream-field, .dsh-nb-sonar-cursor) { display: none !important; }
 @media (forced-colors: active) {
+  .dsh-nb-ambient-whale-wrap, .dsh-nb-stream-field, .dsh-nb-sonar-cursor, .dsh-nb-stream-brand { display: none !important; }
   .dsh-nb {
     --nb-bg: Canvas; --nb-panel: Canvas; --nb-soft: Canvas; --nb-canvas: Canvas; --nb-island: Canvas; --nb-tile: Canvas;
     --nb-fg: CanvasText; --nb-muted: CanvasText; --nb-line: ButtonText; --nb-hairline: ButtonText; --nb-accent: LinkText; --nb-accent-ink: LinkText;
@@ -998,6 +1431,31 @@ window.__ModuleLoader__.load({
     function ActivityIndicator({ motion = true }) {
       return h('span', { className: 'dsh-nb-activity', role: 'status', 'aria-label': '正在处理', 'aria-live': 'polite', 'aria-atomic': 'true', 'data-activity': 'running' },
         h(RunningWhale, { motion }), h('span', { className: 'dsh-nb-sr-only' }, '正在处理'))
+    }
+    function AbyssalAtmosphere() {
+      return h('div', { className: 'dsh-nb-atmosphere', 'aria-hidden': 'true' },
+        h('div', { className: 'dsh-nb-abyss' },
+          h('span', { className: 'dsh-nb-aurora-veil' }),
+          h('span', { className: 'dsh-nb-aurora-edge' }),
+          h('span', { className: 'dsh-nb-aurora-particles' })),
+        h('div', { className: 'dsh-nb-ambient-whale-wrap' },
+          h('div', { className: 'dsh-nb-ambient-whale-anchor' },
+            h('span', { className: 'dsh-nb-particle-ripple' }),
+            h('span', { className: 'dsh-nb-particle-splash' }),
+            h('span', { className: 'dsh-nb-ambient-whale' },
+              h('img', { className: 'dsh-nb-particle-poster', src: PARTICLE_POSTER, width: 520, height: 280, alt: '' })))),
+        h('div', { className: 'dsh-nb-surface-bloom' }))
+    }
+    function WhaleCrest({ streaming, researchMode }) {
+      const slogan = streaming ? (researchMode ? '深度求索 · 声呐寻证' : '深度求索 · 循证成文') : '深度求索'
+      return h('span', { className: 'dsh-nb-stream-brand' + (streaming ? ' is-live' : ''), 'data-slogan': slogan, 'aria-hidden': 'true' },
+        h('span', { className: 'dsh-nb-brand-dots' }))
+    }
+    function SonarStreamCursor() {
+      return h('span', { className: 'dsh-nb-sonar-cursor', 'aria-hidden': 'true' },
+        h('span', { className: 'dsh-nb-sonar-dots is-d1' }),
+        h('span', { className: 'dsh-nb-sonar-dots is-d2' }),
+        h('span', { className: 'dsh-nb-sonar-core' }))
     }
     function KindMark({ kind }) { return h('span', { className: 'dsh-nb-mark', 'aria-hidden': 'true' }, h(UiIcon, { kind: kind === 'url' ? 'globe' : kind === 'note' ? 'note' : kind === 'file' ? 'file' : 'text' })) }
     function StudioGlyph({ kind }) {
@@ -1183,7 +1641,7 @@ window.__ModuleLoader__.load({
         error ? h('div', { className: 'dsh-nb-status dsh-nb-error', role: 'alert' }, error) : null,
         content)
     }
-    function CitationText({ text, sources, onOpen }) {
+    function CitationText({ text, sources, onOpen, streaming = false }) {
       return h('span', null, ...String(text || '').split(/(\[[^\]\n]{1,180}\]|\bsourceId\s*=\s*[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}(?![\da-z-]))/gi).map((part, index) => {
         const bracketed = part.startsWith('[') && part.endsWith(']')
         const value = bracketed ? part.slice(1, -1) : part
@@ -1192,7 +1650,13 @@ window.__ModuleLoader__.load({
         // Only an exact ID in the active notebook can open a source. Legacy
         // full UUIDs are accepted, but abbreviated and unknown IDs stay text.
         const source = id && sources.find(item => item.id === id)
-        return source ? h('button', { type: 'button', className: 'dsh-nb-citation', key: index, title: source.title, 'aria-label': '查看引用：' + source.title, 'data-citation-source': source.id, onClick: event => onOpen(source.id, { spotlight: true, opener: event.currentTarget }) }, String(sources.indexOf(source) + 1)) : part
+        if (source) return h('button', { type: 'button', className: 'dsh-nb-citation', key: 'cit-' + index, title: source.title, 'aria-label': '查看引用：' + source.title, 'data-citation-source': source.id, onClick: event => onOpen(source.id, { spotlight: true, opener: event.currentTarget }) }, String(sources.indexOf(source) + 1))
+        if (!streaming || !part) return part
+        const segments = []
+        for (let offset = 0; offset < part.length; offset += 12) {
+          segments.push(h('span', { key: 'seg-' + index + '-' + offset, className: 'dsh-nb-wave-seg' }, part.slice(offset, offset + 12)))
+        }
+        return segments
       }))
     }
     function SelectionCheckbox({ checked, mixed, disabled, onChange }) {
@@ -1354,7 +1818,9 @@ window.__ModuleLoader__.load({
       const [activeSide, setActiveSide] = useState('studio')
       const [studyBusy, setStudyBusy] = useState(false)
       const [workspaceTitle, setWorkspaceTitle] = useState('')
+      const [divePhase, setDivePhase] = useState('idle')
       const rootRef = useRef(null)
+      const diveTimerRef = useRef(null), wasBuildingRef = useRef(false), wasResearchBuildRef = useRef(false), diveWorkspaceRef = useRef('')
       const sourceOpener = useRef(null), studioOpener = useRef(null)
       const sourceReturnPane = useRef(''), studioReturnPane = useRef('')
       const detailStack = useRef([])
@@ -1390,6 +1856,8 @@ window.__ModuleLoader__.load({
       const provider = providers.find(item => item.id === providerId)
       const modelId = workspace?.model || (inherited.provider === providerId ? inherited.model : '') || provider?.models?.[0]?.id || ''
       const mode = requestedModes[workspace?.id] || workspace?.mode || 'research'
+      const buildingRunning = researchRunning || Boolean(pending.researchStart) || (mode === 'research' && (task?.status === 'running' || Boolean(pending.chat)))
+      const livePolling = Boolean(workspaceId && (task?.status === 'running' || researchRunning))
       const hasRoute = Boolean(providerId && modelId && provider?.models?.some(item => item.id === modelId))
       const busyStudio = artifacts.some(pendingArtifact) || Object.keys(pending).some(key => key.startsWith('generate:') && pending[key])
       const canSend = Boolean(workspaceId && hasRoute && question.trim() && !running && !requestedModes[workspaceId] && (mode === 'research' || (notebook && selected)))
@@ -1456,8 +1924,9 @@ window.__ModuleLoader__.load({
           // A read that crossed a mode save may still carry the previous mode.
           // Keep its other fields, including refreshed sources and model routes.
           const latest = lastModeSave.current
-          setState(latest !== modeAtRequest && latest?.id === actualId && next.workspace
-            ? { ...next, workspace: { ...next.workspace, mode: latest.mode } } : next)
+          const resolved = latest !== modeAtRequest && latest?.id === actualId && next.workspace
+            ? { ...next, workspace: { ...next.workspace, mode: latest.mode } } : next
+          setState(current => current && JSON.stringify(current) === JSON.stringify(resolved) ? current : resolved)
           if (!quiet) setError('')
           return next
         } catch (err) {
@@ -1495,7 +1964,7 @@ window.__ModuleLoader__.load({
         mounted.current = true
         ensureStyles()
         loadCatalog()
-        return () => { mounted.current = false; stateSequence.current++; detailSequence.current++; sourceSequence.current++ }
+        return () => { clearTimeout(diveTimerRef.current); mounted.current = false; stateSequence.current++; detailSequence.current++; sourceSequence.current++ }
       }, [])
       function pushDetail(side) {
         detailStack.current = [...detailStack.current.filter(item => item !== side), side]
@@ -1545,6 +2014,58 @@ window.__ModuleLoader__.load({
         return () => { clearInterval(timer); stateSequence.current++; detailSequence.current++; sourceSequence.current++ }
       }, [workspaceId])
       useEffect(() => {
+        if (!livePolling) return
+        const fast = setInterval(() => refresh(workspaceId, true), 320)
+        return () => clearInterval(fast)
+      }, [workspaceId, livePolling])
+      useEffect(() => {
+        const currentWs = workspace?.id || workspaceId || ''
+        if (!ui.motion) {
+          clearTimeout(diveTimerRef.current)
+          wasBuildingRef.current = buildingRunning
+          wasResearchBuildRef.current = Boolean(researchRunning || pending.researchStart)
+          diveWorkspaceRef.current = currentWs
+          setDivePhase('idle')
+          return
+        }
+        if (diveWorkspaceRef.current && currentWs && diveWorkspaceRef.current !== currentWs) {
+          clearTimeout(diveTimerRef.current)
+          wasBuildingRef.current = buildingRunning
+          wasResearchBuildRef.current = Boolean(researchRunning || pending.researchStart)
+          diveWorkspaceRef.current = currentWs
+          setDivePhase(buildingRunning ? 'deep' : 'idle')
+          return
+        }
+        diveWorkspaceRef.current = currentWs
+        if (buildingRunning) {
+          if (researchRunning || pending.researchStart) wasResearchBuildRef.current = true
+          if (!wasBuildingRef.current) {
+            wasBuildingRef.current = true
+            clearTimeout(diveTimerRef.current)
+            setDivePhase('diving')
+            diveTimerRef.current = setTimeout(() => {
+              if (mounted.current && wasBuildingRef.current) setDivePhase('deep')
+            }, 1140)
+          }
+        } else if (wasBuildingRef.current) {
+          wasBuildingRef.current = false
+          const wasResearch = wasResearchBuildRef.current
+          wasResearchBuildRef.current = false
+          clearTimeout(diveTimerRef.current)
+          const succeeded = wasResearch
+            ? Boolean(research && ['done', 'partial'].includes(research.status))
+            : task?.status === 'done'
+          if (succeeded) {
+            setDivePhase('surfacing')
+            diveTimerRef.current = setTimeout(() => {
+              if (mounted.current && !wasBuildingRef.current) setDivePhase('idle')
+            }, 1840)
+          } else {
+            setDivePhase('idle')
+          }
+        }
+      }, [ui.motion, buildingRunning, researchRunning, pending.researchStart, workspace?.id, workspaceId, research?.status, task?.status])
+      useEffect(() => {
         detailSequence.current++; sourceSequence.current++
         detailStack.current = []; sourceReturnPane.current = ''; studioReturnPane.current = ''
         setArtifactId(''); setArtifact(null); setStudioWide(false); setStudyBusy(false); setSourceId(''); setSource(null); setSourceName(''); setConfirmDelete(false)
@@ -1558,8 +2079,8 @@ window.__ModuleLoader__.load({
         run('workspaceUpdate', { provider: providerId, model: modelId })
       }, [workspace?.id, workspace?.provider, workspace?.model, providerId, modelId])
       useEffect(() => {
-        if (threadRef.current && followThread.current) threadRef.current.scrollTop = messages.length ? threadRef.current.scrollHeight : 0
-      }, [messages.length, messages[messages.length - 1]?.text, task?.status, research?.status])
+        if (threadRef.current && followThread.current) threadRef.current.scrollTop = (messages.length || research || divePhase !== 'idle') ? threadRef.current.scrollHeight : 0
+      }, [messages.length, messages[messages.length - 1]?.text, task?.status, research?.status, divePhase])
       useEffect(() => {
         if (!artifactId || !workspaceId || !artifacts.some(item => item.id === artifactId)) return
         const target = workspaceId
@@ -1682,7 +2203,8 @@ window.__ModuleLoader__.load({
       const researchStatus = ({ done: '构建完成', partial: '部分完成', failed: '构建失败', cancelled: '已停止', interrupted: '运行中断' })[research?.status] || '构建结果'
       const imported = [...(research?.imported || []), ...(research?.reused || []).map(item => ({ ...item, reused: true }))].filter((item, index, items) => items.findIndex(other => other.sourceId === item.sourceId) === index)
       const researchInNotebook = !research?.notebookId || research.notebookId === state?.notebookId
-      const researchCard = research ? h('section', { className: 'dsh-nb-research' + (researchRunning ? ' is-running' : ''), 'aria-label': researchRunning ? '构建目标' : '构建结果', 'data-research-status': research.status },
+      const researchSlogan = researchRunning ? '深度求索 · 目标锚定' : ['done', 'partial'].includes(research?.status) ? '深度求索 · 寻证归档' : undefined
+      const researchCard = research ? h('section', { key: 'research-card', className: 'dsh-nb-research' + (researchRunning ? ' is-running' : ''), 'aria-label': researchRunning ? '构建目标' : '构建结果', 'data-research-status': research.status, 'data-slogan': researchSlogan },
         !researchRunning ? h('div', { className: 'dsh-nb-research-heading', role: 'status', 'data-research-completed': imported.length, 'data-research-target': research.targetSources }, h('strong', null, researchStatus), h('span', { className: 'dsh-nb-meta' }, '已收录 ' + imported.length + (imported.length < research.targetSources ? ' / ' + research.targetSources : '') + ' 份资料')) : null,
         h('p', { className: 'dsh-nb-research-goal' }, research.prompt),
         research.error || research.artifactError ? h('p', { className: 'dsh-nb-research-error', role: 'alert' }, research.error || research.artifactError) : null,
@@ -1791,8 +2313,32 @@ window.__ModuleLoader__.load({
             artifact.error ? h('p', { className: 'dsh-nb-research-error', role: 'alert' }, artifact.error) : null,
             artifact.body ? h('pre', { className: 'dsh-nb-preview' }, ['study-guide', 'briefing', 'report'].includes(artifact.kind) ? h(CitationText, { text: artifact.body, sources, onOpen: viewSource }) : artifact.body) : artifact.status === 'done' ? h('p', { className: 'dsh-nb-meta' }, '内容为空。') : pendingArtifact(artifact) ? h('p', { className: 'dsh-nb-meta' }, '正在生成内容，后台任务完成后自动刷新…') : null) : !error ? h('p', { className: 'dsh-nb-meta' }, '正在加载内容…') : null)) : null
 
-      return h('div', { ref: rootRef, className: 'dsh-nb dsh-nb-workbench', 'data-workspace-id': workspace?.id || '', 'data-notebook-id': state?.notebookId || '', 'data-pane': pane, 'data-pane-direction': paneDirection, 'data-mode': mode, 'data-running': String(running), 'data-motion': ui.motion ? 'enabled' : 'static', 'data-sources-collapsed': String(ui.sourcesCollapsed), 'data-studio-collapsed': String(ui.studioCollapsed), 'data-source-open': String(Boolean(sourceId)), 'data-studio-open': String(Boolean(artifactId)), 'data-studio-wide': String(Boolean(studioWide)), 'data-active-side': activeSide },
+      const activeDivePhase = ui.motion ? (divePhase === 'idle' && buildingRunning ? 'diving' : divePhase) : 'idle'
+      const showEmptyHero = !messages.length && !research && Boolean(state)
+      const renderMessage = (item, index) => {
+        const isStreaming = item.role === 'assistant' && (item.status === 'streaming' || (task?.status === 'running' && index === messages.length - 1))
+        return h('article', {
+          key: item.id || index,
+          className: 'dsh-nb-message ' + item.role + (item.status === 'failed' ? ' is-failed' : '') + (isStreaming ? ' is-streaming' : ''),
+          'data-streaming': isStreaming ? 'true' : undefined,
+        },
+          isStreaming && ui.motion ? h('div', { className: 'dsh-nb-stream-field', 'aria-hidden': 'true' },
+            h('span', { className: 'dsh-nb-sonar-wave is-w1' }),
+            h('span', { className: 'dsh-nb-sonar-wave is-w2' }),
+            h('span', { className: 'dsh-nb-sonar-wave is-w3' })) : null,
+          h('div', { className: 'dsh-nb-message-meta' },
+            h('span', null, item.role === 'user' ? '你' : '助手'),
+            item.role === 'assistant' && ui.motion ? h(WhaleCrest, { streaming: isStreaming, researchMode: mode === 'research' || Boolean(research) }) : null,
+            ['failed', 'cancelled'].includes(item.status) ? h('span', null, item.status === 'failed' ? '未完成' : '已停止') : null),
+          h('div', { className: 'dsh-nb-message-body' },
+            h(CitationText, { text: item.text, sources, onOpen: viewSource, streaming: isStreaming && ui.motion }),
+            isStreaming && ui.motion ? h(SonarStreamCursor) : null),
+          item.role === 'assistant' && String(item.text || '').trim() && !running ? h('div', { className: 'dsh-nb-message-actions' }, menuButton('pin', '保存到笔记', async () => { if (await run('saveNote', { title: (workspace?.title || '研究') + ' · 回答笔记', body: item.text }, 'note:' + item.id)) setNotice('已保存到当前笔记本。') }, { disabled: !notebook || pending['note:' + item.id], 'data-action': 'save-answer' })) : null)
+      }
+
+      return h('div', { ref: rootRef, className: 'dsh-nb dsh-nb-workbench', 'data-workspace-id': workspace?.id || '', 'data-notebook-id': state?.notebookId || '', 'data-pane': pane, 'data-pane-direction': paneDirection, 'data-mode': mode, 'data-running': String(running), 'data-dive': activeDivePhase, 'data-motion': ui.motion ? 'enabled' : 'static', 'data-sources-collapsed': String(ui.sourcesCollapsed), 'data-studio-collapsed': String(ui.studioCollapsed), 'data-source-open': String(Boolean(sourceId)), 'data-studio-open': String(Boolean(artifactId)), 'data-studio-wide': String(Boolean(studioWide)), 'data-active-side': activeSide },
         h('div', { className: 'dsh-nb-stage' },
+          h(AbyssalAtmosphere),
           h('header', { className: 'dsh-nb-toolbar' },
             h('span', { className: 'dsh-nb-toolbar-brand' }, h(NotebookIcon, { size: 22 })),
             h('button', { type: 'button', className: 'dsh-nb-notebook-trigger', 'aria-label': '切换或管理笔记本', 'aria-haspopup': 'dialog', onClick: () => setDialog('notebooks'), 'data-action': 'notebooks' }, h('span', null, notebook?.title || 'Notebook'), h(UiIcon, { kind: 'chevron' })),
@@ -1827,13 +2373,14 @@ window.__ModuleLoader__.load({
             h('section', { className: 'dsh-nb-col is-main', 'aria-label': '研究对话' },
               h('div', { className: 'dsh-nb-head' }, h('span', { className: 'dsh-nb-title', title: workspace?.title }, workspace?.title || '对话'), h('span', { className: 'dsh-nb-meta dsh-nb-scope' }, mode === 'sources' ? '基于 ' + selected + ' 个来源' : '可使用资料搜集工具')),
               h('div', { className: 'dsh-nb-thread', ref: threadRef },
-                !messages.length && !research && state ? h('div', { className: 'dsh-nb-hero' }, h('span', { className: 'dsh-nb-hero-mark' }, h(ParticleWhale, { motion: ui.motion })), h('h2', null, mode === 'sources' ? '让资料，连成思路' : '从一个问题，开始研究'), h('p', { className: 'dsh-nb-meta' }, mode === 'sources' ? '从勾选来源出发，提问、比较，整理思路。' : '搜集资料、整理证据，逐步建立你的笔记本。'), h('div', { className: 'dsh-nb-suggest' }, mode === 'research' ? chip('自动构建笔记本', openResearch, { disabled: !workspace || running, 'data-action': 'hero-research' }) : null, (mode === 'sources' ? SUGGEST : ['围绕研究目标搜集资料', '读取本地资料，整理证据']).map(text => chip(text, () => { setQuestion(text); composerRef.current?.focus() }, { key: text, disabled: running })))) : null,
+                showEmptyHero ? h('div', { key: 'empty-hero', className: 'dsh-nb-hero' },
+                  h('span', { className: 'dsh-nb-hero-mark' }, h(ParticleWhale, { motion: ui.motion })),
+                  h('h2', null, mode === 'sources' ? '让资料，连成思路' : '从一个问题，开始研究'),
+                  h('p', { className: 'dsh-nb-meta' }, mode === 'sources' ? '从勾选来源出发，提问、比较，整理思路。' : '搜集资料、整理证据，逐步建立你的笔记本。'),
+                  h('div', { className: 'dsh-nb-suggest' }, mode === 'research' ? chip('自动构建笔记本', openResearch, { disabled: !workspace || running, 'data-action': 'hero-research' }) : null, (mode === 'sources' ? SUGGEST : ['围绕研究目标搜集资料', '读取本地资料，整理证据']).map(text => chip(text, () => { setQuestion(text); composerRef.current?.focus() }, { key: text, disabled: running })))) : null,
                 researchCard,
-                h('div', { className: 'dsh-nb-messages' }, messages.map((item, index) => h('article', { key: item.id || index, className: 'dsh-nb-message ' + item.role + (item.status === 'failed' ? ' is-failed' : '') },
-                  h('div', { className: 'dsh-nb-message-meta' }, h('span', null, item.role === 'user' ? '你' : '助手'), ['failed', 'cancelled'].includes(item.status) ? h('span', null, item.status === 'failed' ? '未完成' : '已停止') : null),
-                  h('div', { className: 'dsh-nb-message-body' }, h(CitationText, { text: item.text, sources, onOpen: viewSource })),
-                  item.role === 'assistant' && String(item.text || '').trim() && !running ? h('div', { className: 'dsh-nb-message-actions' }, menuButton('pin', '保存到笔记', async () => { if (await run('saveNote', { title: (workspace?.title || '研究') + ' · 回答笔记', body: item.text }, 'note:' + item.id)) setNotice('已保存到当前笔记本。') }, { disabled: !notebook || pending['note:' + item.id], 'data-action': 'save-answer' })) : null))),
-                !running && task?.status === 'cancelled' && !research ? h('p', { className: 'dsh-nb-meta' }, '本次运行已停止。') : null),
+                messages.length ? h('div', { key: 'messages-list', className: 'dsh-nb-messages' }, messages.map((item, idx) => renderMessage(item, idx))) : null,
+                !running && task?.status === 'cancelled' && !research ? h('p', { key: 'cancelled-note', className: 'dsh-nb-meta' }, '本次运行已停止。') : null),
               status,
               h('form', { className: 'dsh-nb-composer', onSubmit: event => { event.preventDefault(); if (canSend) ask(question) } },
                 h('textarea', { rows: 2, ref: composerRef, 'aria-label': '发送给模型的消息', placeholder: !hasRoute ? '选择可用模型后开始…' : mode === 'sources' ? '向这些资料提问…' : '描述研究目标，或提供网址和资料路径…', value: question, onChange: event => setQuestion(event.target.value), onKeyDown: event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && !event.nativeEvent?.isComposing && event.keyCode !== 229) { event.preventDefault(); if (canSend) ask(question) } } }),
