@@ -58,6 +58,14 @@ async function open(scene, width = 1440, height = 960) {
 async function input(session, selector, value) { await evaluate(session, `(() => { const node = document.querySelector(${JSON.stringify(selector)}); if (!node) throw new Error('missing input'); node.focus(); node.value = ${JSON.stringify(value)}; node.dispatchEvent(new Event('input', { bubbles: true })); })()`); await delay(20) }
 async function click(session, selector) { await evaluate(session, `document.querySelector(${JSON.stringify(selector)}).click()`); await delay(30) }
 async function select(session, selector, value) { await evaluate(session, `(() => { const node = document.querySelector(${JSON.stringify(selector)}); node.value = ${JSON.stringify(value)}; node.dispatchEvent(new Event('change', { bubbles: true })); })()`); await delay(50) }
+async function selectModel(session, label, provider, model) {
+  const trigger = '[aria-label="' + label + '"]'
+  await click(session, trigger)
+  const selector = '.dsh-nb-model-list:popover-open [role="option"][data-provider="' + provider + '"][data-model="' + model + '"]'
+  await waitFor(session, 'document.querySelector(' + JSON.stringify(selector) + ')')
+  await click(session, selector)
+  await waitFor(session, `(() => { const trigger = document.querySelector(${JSON.stringify(trigger)}); return !trigger.disabled && trigger.getAttribute('aria-expanded') === 'false' && trigger.dataset.provider === ${JSON.stringify(provider)} && trigger.dataset.model === ${JSON.stringify(model)} })()`)
+}
 async function shot(session, name) { const result = await send('Page.captureScreenshot', { format: 'png' }, session); const path = join(outputDir, name + '.png'); await writeFile(path, Buffer.from(result.data, 'base64')); report.screenshots.push(path) }
 // Use each whale's own pixels so unrelated focus, typing and other motion
 // cannot affect the frame comparisons.
@@ -103,8 +111,26 @@ try {
   ws.addEventListener('close', () => { for (const request of pending.values()) request.reject(new Error('Browser connection closed')); pending.clear() })
   const ready = await open('ready')
   check('工作台通过宿主 RPC 通道加载资料与模型', await evaluate(ready, `window.__nbDev.requests.some(item => item.op === 'state') && window.__nbDev.requests.some(item => item.op === 'catalog') && window.__nbDev.requests.every(item => item.rpc && item.url === 'api/dsh-notebook/api' && item.method === 'dsh-notebook/api')`))
-  check('工作台加载来源与模型目录', await evaluate(ready, `document.querySelectorAll('.dsh-nb-source').length === 4 && document.querySelector('[aria-label="对话模型"]').value === JSON.stringify(['dev-local', 'fixture-research'])`))
-  await select(ready, '[aria-label="对话模型"]', JSON.stringify(['dev-local', 'fixture-compact']))
+  check('工作台加载来源与模型目录', await evaluate(ready, `document.querySelectorAll('.dsh-nb-source').length === 4 && document.querySelector('[aria-label="对话模型"]').dataset.model === 'fixture-research'`))
+  const chatModel = '[aria-label="对话模型"]'
+  const openModelList = '.dsh-nb-model-list:popover-open'
+  await click(ready, chatModel)
+  await waitFor(ready, `document.querySelector('${openModelList} [aria-selected=true]') === document.activeElement`)
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'End', code: 'End', windowsVirtualKeyCode: 35 }, ready)
+  check('模型菜单按提供方分组并允许键盘跨组定位', await evaluate(ready, `document.querySelector('${openModelList}').querySelectorAll('[role=group]').length === 2 && document.activeElement.dataset.model === 'fixture-other'`))
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, ready)
+  await waitFor(ready, `!document.querySelector('${openModelList}') && document.activeElement.matches('${chatModel}')`)
+  check('Escape 返回模型触发器并保留原选择', await evaluate(ready, `document.activeElement.dataset.model === 'fixture-research'`))
+  await click(ready, chatModel)
+  const outsideModelMenu = await evaluate(ready, `(() => { const box = document.querySelector('[aria-label="查找来源"]').getBoundingClientRect(); return { x: box.x + box.width / 2, y: box.y + box.height / 2 } })()`)
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...outsideModelMenu }, ready)
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...outsideModelMenu }, ready)
+  await waitFor(ready, `!document.querySelector('${openModelList}')`)
+  check('点击菜单外保持焦点在新目标', await evaluate(ready, `document.activeElement.matches('[aria-label="查找来源"]')`))
+  await click(ready, chatModel)
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 }, ready)
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, ready)
+  await waitFor(ready, `document.activeElement.matches('${chatModel}') && document.activeElement.dataset.model === 'fixture-compact'`)
   check('模型选择持久化到工作台', await evaluate(ready, `window.__nbDev.store.workspaces[0].model === 'fixture-compact'`))
   await click(ready, '.dsh-nb-source-open')
   await waitFor(ready, `document.querySelector('.dsh-nb-source-body')?.textContent.includes('来源引用')`)
@@ -164,7 +190,7 @@ try {
   check('无宿主会话也可使用工作台', await evaluate(noSession, `document.querySelector('[data-action="bind-session"]').disabled && !document.querySelector('[data-action="new-workspace"]').disabled`))
   await click(noSession, '[aria-label="关闭详情"]')
   await click(noSession, '[data-action="new-workspace"]')
-  await waitFor(noSession, `document.querySelector('.dsh-nb-workbench').dataset.workspaceId !== 'ws1' && document.querySelector('[aria-label="对话模型"]').value`)
+  await waitFor(noSession, `document.querySelector('.dsh-nb-workbench').dataset.workspaceId !== 'ws1' && !document.querySelector('[aria-label="对话模型"]').disabled`)
   await input(noSession, '[aria-label="发送给模型的消息"]', '为我建立一个研究笔记本')
   await click(noSession, '.dsh-nb-send')
   await waitFor(noSession, `document.querySelector('.dsh-nb-message.assistant')`)
@@ -199,7 +225,7 @@ try {
   await click(autoResearch, '[data-action="open-research"]')
   check('自动构建复用草稿且默认新建笔记本和五个来源', await evaluate(autoResearch, `document.querySelector('[aria-label="自动构建研究目标"]').value === '自动研究海洋碳汇' && document.querySelector('[aria-label="创建新的笔记本"]').checked && document.querySelector('[aria-label="目标来源数"]').value === '5'`))
   await select(autoResearch, '[aria-label="目标来源数"]', '3')
-  await select(autoResearch, '[aria-label="自动构建模型"]', JSON.stringify(['dev-local', 'fixture-compact']))
+  await selectModel(autoResearch, '自动构建模型', 'dev-local', 'fixture-compact')
   await input(autoResearch, '[aria-label="自动构建笔记本标题"]', '海洋碳汇自动研究')
   await click(autoResearch, '[data-action="start-research"]')
   await waitFor(autoResearch, `document.querySelector('[data-research-status="running"]') && !document.querySelector('.dsh-nb-dialog')`)
@@ -268,12 +294,44 @@ try {
   const fresh = await open('fresh')
   check('首次使用自动创建独立工作台', await evaluate(fresh, `window.__nbDev.store.workspaces.length === 1 && document.querySelector('.dsh-nb-workbench').dataset.workspaceId`))
   const narrow = await open('ready', 420, 900)
+  // Hold the first save in flight so a second click really reverses a
+  // pending choice. Both the visible control and persisted mode must agree.
+  await evaluate(narrow, `(() => {
+    const fetch = window.fetch
+    window.__restoreModeFetch = () => { window.fetch = fetch }
+    window.__modeRequests = []
+    window.fetch = async (url, options) => {
+      const body = JSON.parse(options.body).payload
+      if (body.op === 'workspaceUpdate' && body.mode) {
+        window.__modeRequests.push(body.mode)
+        if (window.__modeRequests.length === 1) await new Promise(resolve => { window.__releaseMode = resolve })
+        if (window.__modeRequests.length === 3) throw Error('模拟模式保存失败')
+      }
+      return fetch(url, options)
+    }
+  })()`)
+  await click(narrow, '[data-mode="sources"]')
+  await waitFor(narrow, `window.__releaseMode && document.querySelector('[data-mode="sources"]').getAttribute('aria-pressed') === 'true'`)
+  await click(narrow, '[data-mode="research"]')
+  check('服务返回前可立即反向选择模式', await evaluate(narrow, `window.__modeRequests.join() === 'sources' && document.querySelector('[data-mode="research"]').getAttribute('aria-pressed') === 'true'`))
+  await evaluate(narrow, 'window.__releaseMode()')
+  await waitFor(narrow, `window.__modeRequests.join() === 'sources,research' && window.__nbDev.store.workspaces[0].mode === 'research'`)
+  await click(narrow, '[data-mode="sources"]')
+  await waitFor(narrow, `document.querySelector('.dsh-nb-error')?.textContent.includes('模拟模式保存失败')`)
+  check('模式保存失败恢复已保存选择并保留错误提示', await evaluate(narrow, `window.__nbDev.store.workspaces[0].mode === 'research' && document.querySelector('[data-mode="research"]').getAttribute('aria-pressed') === 'true'`))
+  await evaluate(narrow, 'window.__restoreModeFetch()')
+  await click(narrow, '[data-action="retry"]')
+  await waitFor(narrow, `!document.querySelector('.dsh-nb-error')`)
   check('窄屏不横向溢出', await evaluate(narrow, `document.documentElement.scrollWidth <= innerWidth + 1`))
   check('窄屏页签以正确的按下状态和颜色区分当前视图', await evaluate(narrow, `(() => {
     const tabs = document.querySelector('.dsh-nb-pane-tabs')
     const active = tabs.querySelectorAll('[aria-pressed="true"]'), others = tabs.querySelectorAll('[aria-pressed="false"]')
+    const thumb = tabs.querySelector('.dsh-nb-switch-thumb'), shape = thumb.getBoundingClientRect()
+    const target = active[0].getBoundingClientRect()
     return active.length === 1 && active[0].dataset.paneTarget === 'chat' && others.length === 2 &&
-      getComputedStyle(active[0]).backgroundColor !== getComputedStyle(others[0]).backgroundColor
+      Math.abs((shape.left + shape.right - target.left - target.right) / 2) < 2 &&
+      shape.width > target.width * .95 && shape.width < target.width * 1.05 &&
+      getComputedStyle(active[0]).color !== getComputedStyle(others[0]).color
   })()`))
   await shot(narrow, 'workbench-mobile')
   await beginActivity(narrow)
@@ -395,8 +453,8 @@ try {
 
   const layout = await open('ready', 1100, 800)
   check('常态顶栏只有一行且模型选择位于输入框', await evaluate(layout, `document.querySelector('.dsh-nb-toolbar').getBoundingClientRect().height <= 64 && !!document.querySelector('.dsh-nb-composer .dsh-nb-model-select') && !document.querySelector('.dsh-nb-toolbar select')`))
-  check('七类 Studio 工具使用两列', await evaluate(layout, `document.querySelectorAll('.dsh-nb-card').length === 7 && getComputedStyle(document.querySelector('.dsh-nb-studio-grid')).gridTemplateColumns.split(' ').length === 2`))
-  await select(layout, '[aria-label="对话模型"]', JSON.stringify(['dev-secondary', 'fixture-other']))
+  check('Studio 侧栏突出学习指南，六项工具分成三列', await evaluate(layout, `document.querySelectorAll('.dsh-nb-card:not(.dsh-nb-guide-card)').length === 6 && document.querySelector('.dsh-nb-guide-card')?.dataset.studioKind === 'study-guide' && getComputedStyle(document.querySelector('.dsh-nb-studio-grid')).gridTemplateColumns.split(' ').length === 3`))
+  await selectModel(layout, '对话模型', 'dev-secondary', 'fixture-other')
   check('分组模型菜单同时更新提供方和模型', await evaluate(layout, `window.__nbDev.store.workspaces[0].provider === 'dev-secondary' && window.__nbDev.store.workspaces[0].model === 'fixture-other'`))
   await click(layout, '[data-action="notebooks"]')
   await click(layout, '[data-action="rename-notebook"]')
@@ -587,7 +645,7 @@ try {
   await evaluate(unauthenticated, `window.__nbDev.setAuthenticated(true)`)
   await click(unauthenticated, '[data-action="retry"]')
   await waitFor(unauthenticated, `document.querySelector('.dsh-nb-workbench').dataset.workspaceId && !document.querySelector('.dsh-nb-error')`)
-  check('登录恢复后可同时重读工作台和模型目录', await evaluate(unauthenticated, `document.querySelectorAll('.dsh-nb-source').length === 4 && document.querySelector('[aria-label="对话模型"]').value`))
+  check('登录恢复后可同时重读工作台和模型目录', await evaluate(unauthenticated, `document.querySelectorAll('.dsh-nb-source').length === 4 && !document.querySelector('[aria-label="对话模型"]').disabled`))
 
   check('无未处理浏览器异常', report.exceptions.length === 0)
   report.passed = report.checks.length

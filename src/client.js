@@ -8,10 +8,10 @@ window.__ModuleLoader__.load({
     const STUDIO = [
       ['study-guide', '学习指南', '提纲和自测'],
       ['briefing', '简报', '一页讲清'],
-      ['report', '报告', '带来源引用'],
       ['flashcards', '闪卡', '正反面记忆'],
-      ['quiz', '测验', '检查理解'],
       ['mind-map', '思维导图', '主题与分支'],
+      ['report', '报告', '带来源引用'],
+      ['quiz', '测验', '检查理解'],
       ['data-table', '数据表', '抽出表格'],
     ]
     const STUDIO_ICON = {
@@ -24,6 +24,8 @@ window.__ModuleLoader__.load({
       'data-table': 'M2.8 3.2h10.4v9.6H2.8zM2.8 6.4h10.4M2.8 9.6h10.4M6.4 6.4v6.4',
     }
     const SUGGEST = ['总结这些来源', '列出关键概念', '这些资料有什么分歧？']
+    const PANE_ORDER = ['sources', 'chat', 'studio']
+    const SOURCE_TYPES = ['text', 'url', 'file']
     // DSH's native 3-second whale animation, embedded to keep the client self-contained.
     // Copyright (c) 2026 DeepSeek. MIT license and source: THIRD_PARTY_NOTICES.md.
     const WHALE_ANIMATION = 'data:image/png;base64,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'
@@ -127,9 +129,34 @@ window.__ModuleLoader__.load({
   box-shadow: inset 0 .7px 0 color-mix(in srgb, currentColor 31%, transparent);
 }
 @media (forced-colors: active) { .dsh-nb-activity::before { display: none; } }
-.dsh-nb-pane-tabs { display: none; flex: none; gap: 6px; padding: 0 12px 10px; }
-.dsh-nb-pane-tabs button { flex: 1; padding: 8px; color: var(--nb-muted); border-radius: 8px; font-size: 12px; }
-.dsh-nb-pane-tabs button[aria-pressed=true] { background: var(--nb-accent-soft); color: var(--nb-accent); }
+.dsh-nb-pane-tabs { display: none; justify-content: center; flex: none; padding: 0 12px 10px; }
+.dsh-nb-pane-switch, .dsh-nb-mode, .dsh-nb-tabs { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; position: relative; isolation: isolate; padding: 3px; border: 1px solid var(--nb-line); border-radius: 999px; }
+.dsh-nb-pane-switch { width: min(100%, 380px); background: color-mix(in srgb, var(--nb-panel) 72%, transparent); }
+.dsh-nb-pane-tabs button { padding: 7px 10px; font-size: 12px; }
+.dsh-nb-pane-switch button, .dsh-nb-mode button, .dsh-nb-tabs button { position: relative; min-width: 0; border-radius: inherit; color: var(--nb-muted); }
+.dsh-nb-switch-track { position: absolute; inset: 2px; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.dsh-nb-switch-thumb {
+  position: absolute; inset-block: 0;
+  left: calc(100% * var(--nb-choice) / var(--nb-choices));
+  right: calc(100% * (var(--nb-choices) - var(--nb-choice) - 1) / var(--nb-choices));
+  min-width: 0; border: 1px solid var(--nb-glass-edge); border-radius: 999px;
+  background: linear-gradient(125deg, var(--nb-accent-soft), transparent 80%), var(--nb-panel);
+  box-shadow: inset 0 1px var(--nb-glass-highlight);
+}
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .dsh-nb-switch-thumb {
+    /* The leading edge moves first. Each edge can reverse from its current position. */
+    --leading: 300ms; --trailing: 440ms;
+    --settle: cubic-bezier(.21,.78,.29,1);
+    transition: left var(--trailing) var(--settle), right var(--leading) var(--settle);
+  }
+  @supports (transition-timing-function: linear(0, 1)) {
+    .dsh-nb[data-motion=enabled] .dsh-nb-switch-thumb {
+      --settle: linear(0, .043 5%, .165 12%, .395 22%, .66 34%, .86 46%, .978 59%, 1.018 71%, 1.008 85%, 1);
+    }
+  }
+  .dsh-nb[data-motion=enabled] .dsh-nb-switch-track[data-backwards=true] .dsh-nb-switch-thumb { transition-duration: var(--leading), var(--trailing); }
+}
 .dsh-nb-grid { flex: 1; min-height: 0; min-width: 0; display: grid; grid-template-columns: var(--nb-left) minmax(0, 1fr) var(--nb-right); gap: 14px; padding: 10px 12px 12px; }
 .dsh-nb-col { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .dsh-nb-col.is-sources, .dsh-nb-col.is-studio { border: 1px solid var(--nb-glass-edge, var(--nb-line)); border-radius: 16px; background-color: var(--nb-panel); }
@@ -152,7 +179,7 @@ window.__ModuleLoader__.load({
 .dsh-nb-source { display: flex; align-items: center; gap: 8px; padding: 10px 7px; border-radius: 9px; }
 .dsh-nb-source:hover { background: var(--nb-soft); }
 .dsh-nb-source-open { flex: 1; min-width: 0; display: flex; gap: 9px; align-items: center; text-align: left; }
-.dsh-nb-mark, .dsh-nb-art > .dsh-nb-ico { display: inline-grid; place-items: center; flex: none; width: 26px; height: 29px; border: 1px solid var(--nb-glass-edge, var(--nb-line)); border-radius: 7px; color: var(--nb-muted); }
+.dsh-nb-mark { display: inline-grid; place-items: center; flex: none; width: 26px; height: 29px; border: 1px solid var(--nb-glass-edge, var(--nb-line)); border-radius: 7px; color: var(--nb-muted); }
 .dsh-nb-source:has(.dsh-nb-check:checked) .dsh-nb-mark { color: var(--nb-accent); }
 .dsh-nb-copy { display: grid; gap: 3px; min-width: 0; }
 .dsh-nb-copy .dsh-nb-title { display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 13px; font-weight: 450; }
@@ -199,11 +226,9 @@ window.__ModuleLoader__.load({
 .dsh-nb-composer textarea { width: 100%; display: block; min-height: 44px; max-height: 140px; resize: none; padding: 0 2px; border: 0; background: transparent; font-size: 14px; line-height: 1.5; }
 .dsh-nb-composer textarea:focus-visible { outline: none; }
 .dsh-nb-composer-bottom { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 9px; }
-.dsh-nb-mode { display: flex; padding: 2px; gap: 2px; border-radius: 7px; background: var(--nb-bg); }
-.dsh-nb-mode button { padding: 4px 6px; font-size: 11px; border-radius: 5px; color: var(--nb-muted); white-space: nowrap; }
-.dsh-nb-mode button.on { color: var(--nb-accent); background: var(--nb-accent-soft); }
+.dsh-nb-mode { background: var(--nb-bg); }
+.dsh-nb-mode button { padding: 4px 8px; font-size: 11px; white-space: nowrap; }
 .dsh-nb-model { min-width: 0; flex: 1; max-width: 210px; }
-.dsh-nb select.dsh-nb-model-select { width: 100%; max-width: 100%; min-width: 80px; border: 0; padding: 4px 3px; background: transparent; font-size: 11px; color: var(--nb-muted); text-overflow: ellipsis; }
 .dsh-nb option, .dsh-nb optgroup { background: var(--nb-panel); color: var(--nb-fg); }
 .dsh-nb button.dsh-nb-send { margin-left: auto; flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: var(--nb-accent); color: var(--nb-bg); }
 .dsh-nb button.dsh-nb-send:disabled { background: var(--nb-soft); color: var(--nb-muted); opacity: 1; }
@@ -213,29 +238,78 @@ window.__ModuleLoader__.load({
 .dsh-nb-status > span { min-width: 0; }
 .dsh-nb-status .dsh-nb-chip { flex: none; }
 .dsh-nb-status.dsh-nb-error { color: var(--nb-danger); }
-.dsh-nb-studio { flex: 1; min-height: 0; overflow: auto; padding: 0 12px 14px; }
-.dsh-nb-studio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 18px; }
-.dsh-nb button.dsh-nb-card { display: flex; align-items: center; gap: 8px; text-align: left; border: 1px solid var(--nb-glass-edge, var(--nb-line)); border-radius: 9px; padding: 9px 8px; min-height: 44px; }
-.dsh-nb button.dsh-nb-card:hover:not(:disabled) { background: var(--nb-soft); }
-.dsh-nb-card strong { font-size: 12px; font-weight: 450; }
-.dsh-nb-card .dsh-nb-ico { color: var(--nb-accent); }
-.dsh-nb-card.is-busy { color: var(--nb-accent); }
-.dsh-nb-ico { display: flex; flex: none; color: var(--nb-muted); }
-.dsh-nb-art-heading { border-top: .5px solid var(--nb-line); padding: 14px 2px 8px; margin-top: 12px; font-size: 11px; color: var(--nb-muted); }
-.dsh-nb button.dsh-nb-art { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 3px; margin-bottom: 4px; border-radius: 9px; text-align: left; }
-.dsh-nb button.dsh-nb-art:hover { background: var(--nb-soft); }
+.dsh-nb-studio { container: studio / inline-size; flex: 1; min-height: 0; overflow: auto; padding: 0 12px 16px; }
+.dsh-nb-studio-content, .dsh-nb .is-studio > .dsh-nb-head { width: 100%; max-width: 624px; margin-inline: auto; }
+.dsh-nb .is-studio > .dsh-nb-head { max-width: 648px; }
+.dsh-nb-studio-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-bottom: 14px; }
+.dsh-nb-studio [data-studio-kind] { --studio-ink: color-mix(in srgb, var(--nb-accent) 55%, #8e79c7); --studio-shape: 11px 15px 11px 15px; }
+.dsh-nb-studio :is([data-studio-kind=flashcards], [data-studio-kind=quiz]) { --studio-ink: color-mix(in srgb, var(--nb-fg) 38%, #cf875b); --studio-shape: 48% 48% 11px 11px; }
+.dsh-nb-studio :is([data-studio-kind=mind-map], [data-studio-kind=data-table]) { --studio-ink: color-mix(in srgb, var(--nb-fg) 34%, #408e82); --studio-shape: 15px 8px 15px 8px; }
+.dsh-nb button.dsh-nb-card { min-width: 0; border-radius: 15px; padding: 7px 3px 8px; min-height: 66px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.dsh-nb-card strong { font-size: 12px; font-weight: 475; line-height: 1.45; }
+.dsh-nb button.dsh-nb-card[aria-busy=true] { opacity: .76; }
+.dsh-nb-card[aria-busy=true] .dsh-nb-ico { box-shadow: inset 0 0 0 1px currentColor; }
+.dsh-nb-ico { display: inline-grid; flex: none; place-items: center; width: 36px; height: 32px; border-radius: var(--studio-shape); color: var(--studio-ink); background: color-mix(in srgb, var(--studio-ink) 14%, var(--nb-panel)); }
+.dsh-nb-ico svg { width: 18px; height: 18px; }
+.dsh-nb button.dsh-nb-guide-card {
+  grid-column: 1 / -1; position: relative; isolation: isolate; overflow: hidden; align-items: flex-start; gap: 3px;
+  min-height: 86px; margin-bottom: 3px; padding: 14px 85px 14px 15px; text-align: left;
+  background: linear-gradient(112deg, color-mix(in srgb, var(--nb-accent) 10%, var(--nb-panel)), color-mix(in srgb, var(--studio-ink) 17%, var(--nb-panel)));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--studio-ink) 20%, transparent), inset 0 1px var(--nb-glass-highlight);
+}
+.dsh-nb-guide-card strong { font-size: 16px; font-weight: 550; letter-spacing: -.02em; }
+.dsh-nb-guide-card small { font-size: 12px; line-height: 1.5; color: var(--nb-muted); }
+.dsh-nb-guide-art { position: absolute; pointer-events: none; z-index: -1; right: 8px; top: 50%; width: 80px; height: 64px; translate: 0 -50%; color: var(--studio-ink); }
+.dsh-nb-guide-sheet, .dsh-nb-guide-art::before {
+  content: ''; position: absolute; left: 22px; top: 9px; width: 37px; height: 45px; border-radius: 3px 6px 6px 3px;
+  border: 1px solid color-mix(in srgb, currentColor 56%, var(--nb-panel));
+}
+.dsh-nb-guide-art::before { transform: translate(-6px, 0) rotate(-14deg); background: color-mix(in srgb, currentColor 15%, var(--nb-panel)); }
+.dsh-nb-guide-sheet {
+  transform: rotate(12deg); background: linear-gradient(130deg, color-mix(in srgb, currentColor 18%, var(--nb-panel)), var(--nb-panel)); box-shadow: -2px 4px 6px color-mix(in srgb, currentColor 12%, transparent);
+}
+.dsh-nb-guide-sheet::before { content: ''; position: absolute; inset: 0 auto 0 4px; width: 1px; background: currentColor; opacity: .45; }
+.dsh-nb-guide-sheet::after { content: ''; position: absolute; left: 10px; top: 13px; width: 16px; height: 10px; background: linear-gradient(currentColor 0 0) 0 0 / 100% 2px, linear-gradient(currentColor 0 0) 0 6px / 65% 1px; background-repeat: no-repeat; opacity: .75; }
+.dsh-nb-art-heading { display: flex; align-items: baseline; gap: 6px; border-top: 1px solid var(--nb-line); padding: 16px 4px 7px; margin-top: 12px; font-size: 12px; font-weight: 500; }
+.dsh-nb-art-heading small { font-size: 11px; font-weight: 400; color: var(--nb-muted); font-variant-numeric: tabular-nums; }
+.dsh-nb button.dsh-nb-art { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 5px; margin-bottom: 2px; border-radius: 12px; text-align: left; }
+.dsh-nb-art .dsh-nb-ico { width: 31px; height: 31px; }
+.dsh-nb-art-open { display: flex; margin-inline-start: auto; flex: none; color: var(--nb-muted); transform: rotate(-90deg); }
 .dsh-nb-art-copy { min-width: 0; display: grid; gap: 3px; }
-.dsh-nb-art-copy strong { font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
+.dsh-nb-art-copy strong { font-size: 13px; font-weight: 450; overflow-wrap: anywhere; }
 .dsh-nb-art-copy small { font-size: 11px; color: var(--nb-muted); }
+@container studio (max-width: 207px) {
+  .dsh-nb-studio-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container studio (min-width: 510px) {
+  .dsh-nb-studio-grid { grid-template-columns: minmax(148px, 1.7fr) repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .dsh-nb button.dsh-nb-guide-card { grid-area: 1 / 1 / span 2 / span 1; justify-content: flex-end; padding: 14px; margin: 0; }
+  .dsh-nb-guide-art { right: 8px; top: 7px; translate: 0; transform: scale(1.2); transform-origin: right top; }
+}
+@media (hover: hover) {
+  .dsh-nb .dsh-nb-card:not(.dsh-nb-guide-card):hover:not(:disabled), .dsh-nb button.dsh-nb-art:hover { background: color-mix(in srgb, var(--studio-ink) 8%, transparent); }
+  .dsh-nb .dsh-nb-guide-card:hover:not(:disabled) { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--studio-ink) 42%, transparent); }
+}
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb[data-motion=enabled] .dsh-nb-ico, .dsh-nb[data-motion=enabled] .dsh-nb-guide-sheet { transition: transform 360ms cubic-bezier(.2,.92,.24,1.22); }
+  @media (hover: hover) {
+    .dsh-nb[data-motion=enabled] .dsh-nb-card:hover:not(:disabled) .dsh-nb-ico { transform: translateY(-2px) rotate(-4deg); }
+    .dsh-nb[data-motion=enabled] .dsh-nb-guide-card:hover:not(:disabled) .dsh-nb-guide-sheet { transform: translate(2px,-2px) rotate(17deg); }
+  }
+  .dsh-nb[data-motion=enabled] .dsh-nb-card:active:not(:disabled) .dsh-nb-ico { transform: scale(.91); transition-duration: 95ms; }
+  .dsh-nb[data-motion=enabled] .dsh-nb-guide-card:active:not(:disabled) .dsh-nb-guide-sheet { transform: translate(-1px,1px) rotate(9deg) scale(.95); transition-duration: 95ms; }
+}
+@media (forced-colors: active) {
+  .dsh-nb .dsh-nb-ico, .dsh-nb .dsh-nb-guide-sheet, .dsh-nb .dsh-nb-guide-art::before { border: 1px solid ButtonText; color: ButtonText; }
+}
 .dsh-nb-field { width: 100%; min-width: 0; min-height: 36px; border: .5px solid var(--nb-line); border-radius: 8px; padding: 8px 10px; background: var(--nb-bg); }
 .dsh-nb-area { min-height: 150px; resize: vertical; line-height: 1.7; }
 .dsh-nb-form { display: grid; gap: 14px; }
 .dsh-nb-form label { display: grid; gap: 7px; font-size: 12px; }
 .dsh-nb-form-actions, .dsh-nb-source-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .dsh-nb-source-tools .dsh-nb-field { flex: 1; min-width: 130px; }
-.dsh-nb-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-.dsh-nb-tabs button { padding: 6px 10px; border-radius: 8px; background: var(--nb-bg); color: var(--nb-muted); font-size: 12px; }
-.dsh-nb-tabs button.on { color: var(--nb-accent); background: var(--nb-accent-soft); }
+.dsh-nb-tabs { justify-self: start; background: var(--nb-bg); }
+.dsh-nb-tabs button { padding: 6px 10px; font-size: 12px; }
 .dsh-nb-menu { display: grid; gap: 5px; }
 .dsh-nb-menu .dsh-nb-quiet { justify-content: flex-start; padding: 10px; width: 100%; }
 .dsh-nb-dialog { position: fixed; inset: 76px 16px auto auto; margin: 0; width: min(500px, calc(100vw - 32px)); max-height: calc(100dvh - 100px); padding: 20px; border: 0; border-radius: 12px; box-shadow: var(--dsw-elevation-panel, 0 0 0 .5px var(--nb-line), 0 12px 36px #0003); background: var(--nb-panel); color: var(--nb-fg); font: inherit; overflow: auto; animation: dsh-nb-enter 150ms var(--nb-ease) both; }
@@ -271,13 +345,6 @@ window.__ModuleLoader__.load({
     background: linear-gradient(150deg, color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 5%, transparent), transparent 32%), color-mix(in srgb, var(--nb-panel) 62%, transparent);
     box-shadow: inset 0 1px 0 var(--nb-glass-highlight, transparent);
   }
-  .dsh-nb button.dsh-nb-card {
-    border-color: transparent;
-    border-bottom-color: color-mix(in srgb, var(--nb-glass-edge) 62%, transparent);
-    border-radius: 8px 8px 0 0;
-    background: linear-gradient(128deg, color-mix(in srgb, var(--nb-glass-cyan) 5%, transparent), transparent 75%);
-  }
-  .dsh-nb .dsh-nb-card:hover:not(:disabled) { border-color: color-mix(in srgb, var(--nb-accent) 45%, var(--nb-line)); background: var(--nb-accent-soft); }
   .dsh-nb-message.user { background: color-mix(in srgb, var(--nb-panel) 88%, var(--nb-accent)); box-shadow: inset 0 0 0 1px var(--nb-glass-edge, var(--nb-line)); }
   .dsh-nb-dialog { background: linear-gradient(135deg, color-mix(in srgb, var(--nb-glass-cyan, var(--nb-accent)) 6%, transparent), transparent 35%), var(--nb-panel); border: 1px solid var(--nb-glass-edge, var(--nb-line)); border-radius: 16px; }
   @supports (backdrop-filter: blur(1px)) {
@@ -309,7 +376,7 @@ window.__ModuleLoader__.load({
   .dsh-nb-grid { grid-template-columns: 210px minmax(0, 1fr); }
   .dsh-nb[data-sources-collapsed=true] .dsh-nb-grid { grid-template-columns: 42px minmax(0, 1fr); }
   .dsh-nb .is-studio { display: none; }
-  .dsh-nb-pane-tabs { display: flex; padding-top: 8px; padding-bottom: 0; }
+  .dsh-nb-pane-tabs { display: flex; padding-top: 9px; padding-bottom: 0; }
   .dsh-nb[data-pane=studio] .is-studio { display: flex; }
   .dsh-nb[data-pane=studio] .is-main { display: none; }
 }
@@ -373,12 +440,10 @@ window.__ModuleLoader__.load({
 .dsh-nb-composer:focus-within::before { background-position: 85% 100%; }
 .dsh-nb-composer textarea { font-size: var(--dsh-content-font-size, 14px); line-height: calc(24px + var(--dsh-content-font-delta, 0px)); }
 .dsh-nb-composer textarea::placeholder { color: var(--nb-muted); opacity: 1; }
-.dsh-nb-mode { border: 1px solid var(--nb-line); border-radius: 999px; background: color-mix(in srgb, var(--nb-bg) 65%, transparent); }
-.dsh-nb-mode button { border-radius: inherit; padding-inline: 8px; }
-.dsh-nb-mode button.on { box-shadow: inset 0 0 0 1px var(--nb-glass-edge); }
+.dsh-nb-mode { background: color-mix(in srgb, var(--nb-bg) 65%, transparent); }
 .dsh-nb-composer-trailing { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-left: auto; min-width: 0; max-width: 100%; }
 .dsh-nb-composer .dsh-nb-model { flex: 0 1 auto; max-width: min(210px, 36cqi); }
-@container notebook (max-width: 380px) { .dsh-nb-composer .dsh-nb-model { max-width: 24cqi; } .dsh-nb select.dsh-nb-model-select { min-width: 0; } }
+@container notebook (max-width: 380px) { .dsh-nb-composer .dsh-nb-model { max-width: 24cqi; } }
 .dsh-nb button.dsh-nb-send, .dsh-nb button.dsh-nb-stop { flex: none; margin-left: 0; border-radius: 999px; }
 .dsh-nb button.dsh-nb-send {
   width: 34px; height: 34px; color: white; background: var(--dsw-alias-button-info-fill, #4169c9);
@@ -414,9 +479,82 @@ window.__ModuleLoader__.load({
 @media (forced-colors: active) {
   .dsh-nb-composer { background: Canvas; border-color: ButtonText; box-shadow: none; }
   .dsh-nb-composer:focus-within { outline: 2px solid Highlight; }
-  .dsh-nb-mode button.on { border: 2px solid Highlight; }
+  .dsh-nb-switch-track { display: none; }
+  .dsh-nb-mode button.on, .dsh-nb-tabs button.on, .dsh-nb-pane-tabs button[aria-pressed=true] { outline: 2px solid Highlight; outline-offset: -2px; }
 }
 /* End glass surfaces. */
+@media (prefers-reduced-motion: no-preference) {
+  @container notebook (max-width: 999px) {
+    .dsh-nb[data-motion=enabled][data-pane-direction][data-pane=chat] .is-main,
+    .dsh-nb[data-motion=enabled][data-pane-direction][data-pane=studio] .is-studio { animation: dsh-nb-pane-in 270ms cubic-bezier(.18,.82,.29,1) both; }
+  }
+  @container notebook (max-width: 759px) {
+    .dsh-nb[data-motion=enabled][data-pane-direction][data-pane=sources] .is-sources { animation: dsh-nb-pane-in 270ms cubic-bezier(.18,.82,.29,1) both; }
+  }
+}
+.dsh-nb[data-pane-direction=back] { --nb-pane-offset: -8px; }
+@keyframes dsh-nb-pane-in { from { opacity: .78; transform: translateX(var(--nb-pane-offset, 8px)); } to { opacity: 1; transform: none; } }
+.dsh-nb .dsh-nb-model-select {
+  display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-width: 0;
+  min-height: 32px; padding: 4px 9px; border: 1px solid transparent; border-radius: 999px;
+  color: var(--nb-fg); font-size: 12px; font-weight: 500; text-align: start;
+}
+.dsh-nb-model-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-nb-model-mark { display: inline-flex; flex: none; color: var(--nb-accent); }
+.dsh-nb-model-chevron { display: inline-flex; flex: none; margin-left: auto; color: var(--nb-muted); transition: transform 260ms cubic-bezier(.2,.8,.2,1); }
+.dsh-nb-model-select[aria-expanded=true] .dsh-nb-model-chevron { transform: rotate(180deg); }
+.dsh-nb .dsh-nb-model-select:is(:hover:not(:disabled), [aria-expanded=true]) { background: var(--nb-accent-soft); }
+.dsh-nb .dsh-nb-model-select:focus-visible { outline-offset: 1px; }
+.dsh-nb select.dsh-nb-model-select { width: 100%; background-color: var(--nb-panel); }
+.dsh-nb-model-field { display: grid; gap: 7px; min-width: 0; font-size: 12px; }
+.dsh-nb-model-field .dsh-nb-model-select { width: 100%; min-height: 38px; padding-inline: 11px; border-color: var(--nb-line); border-radius: 11px; background: var(--nb-bg); }
+.dsh-nb-model-list {
+  position: fixed; inset: auto; z-index: 2; margin: 0; padding: 8px; box-sizing: border-box;
+  min-width: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  border: 1px solid var(--nb-glass-edge); border-radius: 18px; color: var(--nb-fg);
+  background: var(--nb-panel); box-shadow: 0 12px 30px -8px #08142635, inset 0 1px 0 var(--nb-glass-highlight);
+  text-align: start; font: inherit; transform-origin: 84% 0%; pointer-events: none;
+}
+.dsh-nb-model-list:popover-open { pointer-events: auto; }
+.dsh-nb-model-list[data-side=above] { transform-origin: 84% 100%; }
+.dsh-nb-model-list [role=group] + [role=group] { border-top: 1px solid var(--nb-line); margin-top: 5px; padding-top: 5px; }
+.dsh-nb-model-provider { padding: 5px 10px 3px; color: var(--nb-muted); font-size: 11px; font-weight: 450; line-height: 1.5; overflow-wrap: anywhere; }
+.dsh-nb button.dsh-nb-model-option {
+  display: grid; grid-template-columns: minmax(0, 1fr) 16px; width: 100%; min-height: 35px; align-items: center;
+  gap: 10px; padding: 7px 10px; border-radius: 10px; color: var(--nb-fg); font-size: 13px;
+  line-height: 1.45; text-align: start; overflow-wrap: anywhere;
+}
+.dsh-nb-model-option[aria-selected=true] { background: var(--nb-accent-soft); font-weight: 550; }
+.dsh-nb-model-option svg { color: var(--nb-accent); }
+.dsh-nb button.dsh-nb-model-option:hover { background-color: color-mix(in srgb, var(--nb-soft) 70%, var(--nb-accent-soft)); }
+.dsh-nb button.dsh-nb-model-option:focus-visible { outline: 1px solid var(--nb-accent); outline-offset: -2px; }
+@media (pointer: coarse) { .dsh-nb .dsh-nb-model-select, .dsh-nb button.dsh-nb-model-option { min-height: 40px; } }
+@container notebook (max-width: 420px) { .dsh-nb-composer .dsh-nb-model-mark { display: none; } .dsh-nb-composer .dsh-nb-model-select { gap: 3px; padding-inline: 5px; } }
+@media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+  @supports (backdrop-filter: blur(1px)) {
+    .dsh-nb-model-list {
+      background: linear-gradient(130deg, color-mix(in srgb, var(--nb-accent) 5%, transparent), transparent 70%), color-mix(in srgb, var(--nb-panel) 95%, transparent);
+      backdrop-filter: blur(14px);
+    }
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  .dsh-nb-model-list {
+    --nb-menu-travel: -6px; opacity: 0; transform: translateY(var(--nb-menu-travel)) scale(.975);
+    transition: opacity 110ms ease-in, transform 130ms ease-in, display 130ms allow-discrete, overlay 130ms allow-discrete;
+  }
+  .dsh-nb-model-list[data-side=above] { --nb-menu-travel: 6px; }
+  .dsh-nb-model-list:popover-open {
+    opacity: 1; transform: none;
+    transition: opacity 120ms ease-out, transform 320ms linear(0,.23 12%,.66 27%,.95 45%,1.022 63%,1.014 78%,1);
+  }
+  @starting-style { .dsh-nb-model-list:popover-open { opacity: 0; transform: translateY(var(--nb-menu-travel)) scale(.965); } }
+}
+@media (forced-colors: active) {
+  .dsh-nb-model-list { border-color: ButtonText; background: Canvas; box-shadow: none; }
+  .dsh-nb button.dsh-nb-model-option[aria-selected=true] { border: 1px solid Highlight; }
+}
+
 @keyframes dsh-nb-enter { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 @media (hover: hover) { .dsh-nb button { transition: background-color 140ms var(--nb-ease), color 140ms var(--nb-ease), border-color 140ms var(--nb-ease); } }
 @media (prefers-color-scheme: light) {
@@ -472,6 +610,19 @@ window.__ModuleLoader__.load({
       return h('svg', { width: size, height: size, viewBox: '0 0 16 16', fill: 'none' },
         h('rect', { x: 2.5, y: 1.5, width: 11, height: 13, rx: 1.6, stroke: 'currentColor', strokeWidth: 1.3 }),
         h('path', { d: 'M5.5 1.8v12.4M8 5.2h3.2M8 8h3.2', stroke: 'currentColor', strokeWidth: 1.2 }))
+    }
+    function SwitchTrack({ index, count, backwards }) {
+      return h('span', {
+        className: 'dsh-nb-switch-track', 'aria-hidden': 'true', 'data-backwards': String(backwards),
+        style: { '--nb-choice': String(index), '--nb-choices': String(count) },
+      }, h('span', { className: 'dsh-nb-switch-thumb' }))
+    }
+    function useSegmentSelection(initial, order) {
+      const [selection, setSelection] = useState({ value: initial, direction: null })
+      const select = value => setSelection(previous => previous.value === value ? previous : {
+        value, direction: order.indexOf(value) < order.indexOf(previous.value) ? 'back' : 'forward',
+      })
+      return [selection.value, select, selection.direction]
     }
     function ParticleWhale({ motion = true }) {
       const [canPlay, setCanPlay] = useState(false)
@@ -534,6 +685,7 @@ window.__ModuleLoader__.load({
     }
     function UiIcon({ kind, size = 16 }) {
       const paths = {
+        model: 'm8 2.2 5.7 3.15L8 8.55 2.3 5.35zm-5.5 6.1L8 11.4l5.5-3.1M2.5 11.1 8 14.2l5.5-3.1', check: 'm3.1 8 3.15 3.2 6.6-6.5',
         plus: 'M8 3v10M3 8h10', chevron: 'm4 6 4 4 4-4', more: 'M3 8h.01M8 8h.01M13 8h.01', close: 'm4 4 8 8M12 4l-8 8',
         history: 'M3 5a5.4 5.4 0 1 1-.3 5M2 2v4h4M8 4v4l3 2', send: 'M8 13V3m-4 4 4-4 4 4', stop: 'M4 4h8v8H4z',
         left: 'M2 2.5h12v11H2zM6 2.5v11m5-7-2 2 2 2', right: 'M2 2.5h12v11H2zM10 2.5v11M5 6.5l2 2-2 2',
@@ -543,6 +695,142 @@ window.__ModuleLoader__.load({
       }
       return h('svg', { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true', focusable: 'false' }, h('path', { d: paths[kind] || paths.file, stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round' }))
     }
+    let pickerSequence = 0
+    function ModelPicker({ label, field = false, providers, providerId, modelId, disabled, saving, onSelect }) {
+      const trigger = useRef(null), list = useRef(null)
+      const [id] = useState(() => 'dsh-nb-models-' + ++pickerSequence)
+      const [open, setOpen] = useState(false), [placement, setPlacement] = useState(null)
+      const typeahead = useRef({ text: '', time: 0 })
+      const groups = providers.filter(item => item.models?.length)
+      const provider = groups.find(item => item.id === providerId)
+      const model = provider?.models.find(item => item.id === modelId)
+      const valueText = model ? model.name || model.id : modelId ? modelId + '（暂不可用）' : '无可用模型'
+      const unavailable = disabled || !groups.length
+      const locked = unavailable || saving
+
+      function positionMenu() {
+        const button = trigger.current
+        const anchor = button.getBoundingClientRect()
+        const panel = field ? null : button.closest('.dsh-nb')?.getBoundingClientRect()
+        const viewport = window.visualViewport
+        const x = viewport?.offsetLeft || 0, y = viewport?.offsetTop || 0
+        const viewportBottom = y + (viewport?.height || window.innerHeight)
+        const left = Math.max(x, panel?.left ?? x) + 8
+        const right = Math.min(x + (viewport?.width || window.innerWidth), panel?.right ?? Infinity) - 8
+        const top = Math.max(y, panel?.top ?? y) + 8
+        const bottom = Math.min(viewportBottom, panel?.bottom ?? viewportBottom) - 8
+        if (!anchor.width || anchor.bottom < top || anchor.top > bottom) { setOpen(false); return false }
+        const above = anchor.top - top - 6, below = bottom - anchor.bottom - 6
+        const upwards = field ? below < Math.min(240, above) : above >= Math.min(240, below)
+        const width = Math.min(Math.max(248, anchor.width), right - left)
+        const start = field ? anchor.left : anchor.right - width
+        setPlacement({ side: upwards ? 'above' : 'below', style: {
+          width: width + 'px', left: Math.max(left, Math.min(start, right - width)) + 'px',
+          maxHeight: Math.min(360, Math.max(1, upwards ? above : below)) + 'px',
+          ...(upwards ? { bottom: (window.innerHeight - anchor.top + 6) + 'px' } : { top: (anchor.bottom + 6) + 'px' }),
+        } })
+        return true
+      }
+
+      function close(restoreFocus) {
+        setOpen(false)
+        if (restoreFocus) trigger.current?.focus({ preventScroll: true })
+      }
+      useEffect(() => {
+        if (!open || locked) { if (open) close(false); return }
+        const menu = list.current, button = trigger.current
+        menu.showPopover()
+        const option = menu.querySelector('[aria-selected=true]') || menu.querySelector('[role=option]')
+        option?.focus({ preventScroll: true })
+        option?.scrollIntoView({ block: 'nearest' })
+        function outside(event) { if (!menu.contains(event.target) && !button.contains(event.target)) close(false) }
+        function reposition(event) { if (!menu.contains(event.target instanceof Node ? event.target : null)) positionMenu() }
+        document.addEventListener('pointerdown', outside, true)
+        document.addEventListener('focusin', outside, true)
+        document.addEventListener('scroll', reposition, true)
+        window.addEventListener('resize', reposition)
+        window.visualViewport?.addEventListener('resize', reposition)
+        const resize = new ResizeObserver(positionMenu)
+        for (const node of [button, button.closest('.dsh-nb'), button.closest('dialog, form')]) if (node) resize.observe(node)
+        return () => {
+          resize.disconnect()
+          document.removeEventListener('pointerdown', outside, true)
+          document.removeEventListener('focusin', outside, true)
+          document.removeEventListener('scroll', reposition, true)
+          window.removeEventListener('resize', reposition)
+          window.visualViewport?.removeEventListener('resize', reposition)
+          if (menu.matches(':popover-open')) menu.hidePopover()
+        }
+      }, [open, locked])
+      function toggle() {
+        if (locked) return
+        if (open) { close(true); return }
+        if (positionMenu()) setOpen(true)
+      }
+      function onMenuKey(event) {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true); return }
+        if (event.key === 'Tab') { close(true); return }
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          if (!event.repeat) event.target.closest('[role=option]')?.click()
+          return
+        }
+        const options = [...list.current.querySelectorAll('[role=option]')]
+        const current = options.indexOf(document.activeElement)
+        let target
+        if (event.key === 'ArrowDown') target = options[(current + 1) % options.length]
+        else if (event.key === 'ArrowUp') target = options[(current + options.length - 1) % options.length]
+        else if (event.key === 'Home') target = options[0]
+        else if (event.key === 'End') target = options.at(-1)
+        else if (event.key.length === 1 && event.key !== ' ' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing) {
+          const now = Date.now(), search = typeahead.current
+          search.text = (now - search.time < 650 ? search.text : '') + event.key.toLocaleLowerCase()
+          search.time = now
+          target = options.find(item => item.textContent.toLocaleLowerCase().startsWith(search.text))
+        }
+        if (target) { event.preventDefault(); target.focus() }
+      }
+      if (typeof HTMLElement.prototype.showPopover !== 'function' || typeof HTMLElement.prototype.hidePopover !== 'function') {
+        return h('div', { className: field ? 'dsh-nb-model-field' : 'dsh-nb-model' },
+          field ? h('label', { htmlFor: id }, '研究模型') : null,
+          h('select', { id, className: 'dsh-nb-model-select', 'aria-label': label, disabled: locked,
+            'data-provider': providerId, 'data-model': modelId, value: model ? JSON.stringify([providerId, modelId]) : '',
+            onChange: event => {
+              const option = event.target.selectedOptions[0]
+              if (!locked && option?.dataset.model) onSelect(option.dataset.provider, option.dataset.model)
+            } },
+            !model ? h('option', { value: '', disabled: true }, valueText) : null,
+            groups.map(group => h('optgroup', { key: group.id, label: group.name || group.id },
+              group.models.map(option => h('option', { key: option.id, 'data-provider': group.id, 'data-model': option.id,
+                value: JSON.stringify([group.id, option.id]) }, option.name || option.id))))))
+      }
+      return h('div', { className: field ? 'dsh-nb-model-field' : 'dsh-nb-model' },
+        field ? h('span', null, '研究模型') : null,
+        h('button', { ref: trigger, type: 'button', className: 'dsh-nb-model-select', disabled: unavailable,
+          'aria-label': label, 'aria-disabled': Boolean(locked), 'aria-describedby': id + '-value', 'data-provider': providerId, 'data-model': modelId, 'aria-haspopup': 'listbox', 'aria-expanded': open, 'aria-controls': id,
+          title: provider && model ? (provider.name || provider.id) + ' · ' + valueText : valueText,
+          onClick: toggle, onKeyDown: event => {
+            if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+              event.preventDefault()
+              if (!event.repeat) toggle()
+            }
+          } },
+          h('span', { className: 'dsh-nb-model-mark' }, h(UiIcon, { kind: 'model', size: 14 })),
+          h('span', { className: 'dsh-nb-model-value', id: id + '-value' }, valueText),
+          h('span', { className: 'dsh-nb-model-chevron' }, h(UiIcon, { kind: 'chevron', size: 13 }))),
+        h('div', { ref: list, id, role: 'listbox', 'aria-label': label + '列表', popover: 'manual', className: 'dsh-nb-model-list',
+          'data-side': placement?.side, style: placement?.style, onKeyDown: onMenuKey },
+          groups.map(group => h('div', { key: group.id, role: 'group', 'aria-label': group.name || group.id },
+            h('div', { className: 'dsh-nb-model-provider', 'aria-hidden': 'true' }, group.name || group.id),
+            group.models.map(option => {
+              const selected = group.id === providerId && option.id === modelId
+              return h('button', { key: option.id, role: 'option', 'aria-selected': selected, type: 'button', tabIndex: -1,
+                className: 'dsh-nb-model-option', 'data-provider': group.id, 'data-model': option.id,
+                onClick: () => { close(true); if (!selected) onSelect(group.id, option.id) } },
+                h('span', null, option.name || option.id), selected ? h(UiIcon, { kind: 'check', size: 15 }) : null)
+            })))))
+    }
+
     let dialogSequence = 0
     function Dialog({ title, onClose, content, error, busy, motion, onStop, stopping }) {
       const ref = useRef(null), closeRef = useRef(onClose)
@@ -713,7 +1001,7 @@ window.__ModuleLoader__.load({
       const [researchTitle, setResearchTitle] = useState('')
       const [researchTarget, setResearchTarget] = useState(5)
       const [researchNewNotebook, setResearchNewNotebook] = useState(true)
-      const [adding, setAdding] = useState('')
+      const [adding, setAdding, addingDirection] = useSegmentSelection('', SOURCE_TYPES)
       const [sourceTitle, setSourceTitle] = useState('')
       const [draft, setDraft] = useState('')
       const [path, setPath] = useState('')
@@ -721,7 +1009,7 @@ window.__ModuleLoader__.load({
       const [notebookTitle, setNotebookTitle] = useState('')
       const [sourceFilter, setSourceFilter] = useState('')
       const [dialog, setDialog] = useState('')
-      const [pane, setPane] = useState('chat')
+      const [pane, setPane, paneDirection] = useSegmentSelection('chat', PANE_ORDER)
       const [ui, setUi] = useState(rememberedUi)
       const [source, setSource] = useState(null)
       const [sourceName, setSourceName] = useState('')
@@ -732,6 +1020,9 @@ window.__ModuleLoader__.load({
       const [studyBusy, setStudyBusy] = useState(false)
       const [workspaceTitle, setWorkspaceTitle] = useState('')
       const active = useRef(workspaceId)
+      const modeWrites = useRef(new Map())
+      const lastModeSave = useRef(null)
+      const [requestedModes, setRequestedModes] = useState({})
       const stateSequence = useRef(0)
       const detailSequence = useRef(0)
       const sourceSequence = useRef(0)
@@ -759,17 +1050,58 @@ window.__ModuleLoader__.load({
       const providerId = workspace?.provider || inherited.provider || usableProviders[0]?.id || ''
       const provider = providers.find(item => item.id === providerId)
       const modelId = workspace?.model || (inherited.provider === providerId ? inherited.model : '') || provider?.models?.[0]?.id || ''
-      const mode = workspace?.mode || 'research'
+      const mode = requestedModes[workspace?.id] || workspace?.mode || 'research'
       const hasRoute = Boolean(providerId && modelId && provider?.models?.some(item => item.id === modelId))
       const busyStudio = artifacts.some(pendingArtifact) || Object.keys(pending).some(key => key.startsWith('generate:') && pending[key])
-      const canSend = Boolean(workspaceId && hasRoute && question.trim() && !running && (mode === 'research' || (notebook && selected)))
+      const canSend = Boolean(workspaceId && hasRoute && question.trim() && !running && !requestedModes[workspaceId] && (mode === 'research' || (notebook && selected)))
       function chooseWorkspace(id) {
         active.current = id
         followThread.current = true
         setWorkspaceId(id)
       }
+      async function chooseMode(value) {
+        const id = workspace?.id
+        if (!id || running) return false
+        let write = modeWrites.current.get(id)
+        if (write) {
+          write.desired = value
+          setRequestedModes(current => ({ ...current, [id]: value }))
+          return (await write.done) === value && active.current === id
+        }
+        let saved = workspace.mode
+        if (saved === value) return true
+        write = { desired: value }
+        modeWrites.current.set(id, write)
+        setRequestedModes(current => ({ ...current, [id]: value }))
+        setError('')
+        // A fast reversal retargets the visible thumb immediately. Persist only
+        // one mode request at a time for this workspace, in final intent order.
+        write.done = (async () => {
+          try {
+            while (write.desired !== saved) {
+              const next = write.desired
+              await api({ op: 'workspaceUpdate', workspaceId: id, mode: next })
+              saved = next
+            }
+          } catch (err) {
+            if (mounted.current && active.current === id) setError(err.message)
+          } finally {
+            modeWrites.current.delete(id)
+            if (mounted.current) {
+              if (active.current === id) {
+                lastModeSave.current = { id, mode: saved }
+                setState(current => current?.workspace?.id === id ? { ...current, workspace: { ...current.workspace, mode: saved } } : current)
+              }
+              setRequestedModes(current => { const remaining = { ...current }; delete remaining[id]; return remaining })
+            }
+          }
+          return saved
+        })()
+        return (await write.done) === value && active.current === id
+      }
       async function refresh(target, quiet = false) {
         const sequence = ++stateSequence.current
+        const modeAtRequest = lastModeSave.current
         try {
           const next = await api({ op: 'state', sessionId: hostSession.current || undefined, ...(target ? { workspaceId: target } : {}) })
           if (!mounted.current || active.current !== target || sequence !== stateSequence.current) return null
@@ -782,7 +1114,11 @@ window.__ModuleLoader__.load({
             return null
           }
           if (!actualId && next.workspaces?.[0]?.id) { chooseWorkspace(next.workspaces[0].id); return next }
-          setState(next)
+          // A read that crossed a mode save may still carry the previous mode.
+          // Keep its other fields, including refreshed sources and model routes.
+          const latest = lastModeSave.current
+          setState(latest !== modeAtRequest && latest?.id === actualId && next.workspace
+            ? { ...next, workspace: { ...next.workspace, mode: latest.mode } } : next)
           if (!quiet) setError('')
           return next
         } catch (err) {
@@ -879,7 +1215,7 @@ window.__ModuleLoader__.load({
       }
       async function ask(text) {
         const value = text.trim()
-        if (!value || running || !workspaceId) return
+        if (!value || running || !workspaceId || modeWrites.current.has(workspaceId)) return
         if (!hasRoute) { setError('请先选择可用的模型。'); return }
         if (mode === 'sources' && (!notebook || !selected)) { setError('资料问答需要先添加并勾选可用来源。'); return }
         const target = workspaceId
@@ -919,8 +1255,7 @@ window.__ModuleLoader__.load({
       const iconButton = (kind, label, onClick, extra = {}) => h('button', { className: 'dsh-nb-icon-button', type: 'button', 'aria-label': label, title: label, onClick, ...extra }, h(UiIcon, { kind }))
       const menuButton = (kind, label, onClick, extra = {}) => h('button', { className: 'dsh-nb-quiet', type: 'button', onClick, ...extra }, h(UiIcon, { kind }), h('span', null, label))
       const readySources = sources.filter(item => item.status === 'ready')
-      const routeValue = hasRoute || (providerId && modelId) ? JSON.stringify([providerId, modelId]) : ''
-      const selectedModel = provider?.models?.find(item => item.id === modelId)
+      const modelPickerProps = { providers, providerId, modelId, saving: pending.workspaceUpdate, onSelect: (provider, model) => run('workspaceUpdate', { provider, model }) }
       const catalogMessage = catalogError || (!hasRoute && catalog ? '没有可用模型。请在 DSH 模型设置中配置提供方，再刷新模型目录。' : '') || provider?.error
       const taskError = !researchRunning && task?.status === 'failed' ? task.error || '这次运行失败，请调整后重试。' : ''
       const statusText = error || taskError || catalogMessage || notice || (mode === 'research' && state?.capabilities?.search === false ? '当前未启用网页搜索，可提供网址或本地路径。' : '')
@@ -953,7 +1288,7 @@ window.__ModuleLoader__.load({
         !researchRunning ? h('details', null, h('summary', null, research.failures?.length ? '查看来源与未完成项目' : '查看来源'),
           imported.length ? h('div', null, h('p', { className: 'dsh-nb-meta' }, '已保存来源'), h('ul', { className: 'dsh-nb-research-imported' }, imported.map((item, index) => h('li', { key: item.sourceId || index }, h('button', { type: 'button', disabled: !sources.some(source => source.id === item.sourceId), onClick: () => viewSource(item.sourceId) }, item.title || item.url || '来源'), h('div', { className: 'dsh-nb-meta' }, [item.url, item.reused ? '复用已有来源' : '', item.truncated ? '正文已截取，请核对完整原文' : ''].filter(Boolean).join(' · ')))))) : null,
           research.failures?.length ? h('div', null, h('p', { className: 'dsh-nb-meta' }, '未完成项目'), h('ul', { className: 'dsh-nb-research-failures' }, research.failures.map((item, index) => h('li', { key: index }, item.url ? h('span', { className: 'dsh-nb-meta' }, item.url + '：') : null, item.error || item.message || '未能完成')))) : null) : null,
-        !running && imported.length && researchInNotebook ? h('div', { className: 'dsh-nb-research-actions' }, chip('进入资料问答', async () => { if (await run('workspaceUpdate', { mode: 'sources' })) { setPane('chat'); composerRef.current?.focus() } }, { 'data-action': 'research-ask', disabled: !selected || pending.workspaceUpdate }), research.artifactId ? chip('打开学习指南', () => { setArtifactId(research.artifactId); setArtifact(null); setDialog('artifact') }, { 'data-action': 'research-guide', disabled: !artifacts.some(item => item.id === research.artifactId) }) : null) : !running && !researchInNotebook ? h('div', { className: 'dsh-nb-research-actions' }, chip('打开研究笔记本', () => openNotebook(research.notebookId), { 'data-action': 'research-notebook', disabled: !state?.notebooks?.some(item => item.id === research.notebookId) || pending.open })) : null) : null
+        !running && imported.length && researchInNotebook ? h('div', { className: 'dsh-nb-research-actions' }, chip('进入资料问答', async () => { if (await chooseMode('sources')) { setPane('chat'); composerRef.current?.focus() } }, { 'data-action': 'research-ask', disabled: !selected || pending.workspaceUpdate }), research.artifactId ? chip('打开学习指南', () => { setArtifactId(research.artifactId); setArtifact(null); setDialog('artifact') }, { 'data-action': 'research-guide', disabled: !artifacts.some(item => item.id === research.artifactId) }) : null) : !running && !researchInNotebook ? h('div', { className: 'dsh-nb-research-actions' }, chip('打开研究笔记本', () => openNotebook(research.notebookId), { 'data-action': 'research-notebook', disabled: !state?.notebooks?.some(item => item.id === research.notebookId) || pending.open })) : null) : null
       let dialogTitle = '', dialogContent = null
       if (dialog === 'research') {
         dialogTitle = '自动构建笔记本'
@@ -963,9 +1298,7 @@ window.__ModuleLoader__.load({
           h('label', null, '目标来源数', h('select', { className: 'dsh-nb-field', 'aria-label': '目标来源数', value: researchTarget, disabled: running, onChange: event => setResearchTarget(Number(event.target.value)) }, [3, 5, 8].map(count => h('option', { key: count, value: count }, count + ' 个来源')))),
           h('label', { className: 'dsh-nb-inline-check' }, h('input', { className: 'dsh-nb-check', type: 'checkbox', 'aria-label': '创建新的笔记本', checked: researchNewNotebook, disabled: running || !notebook, onChange: event => setResearchNewNotebook(event.target.checked) }), '创建新的笔记本'),
           researchNewNotebook ? h('label', null, '笔记本标题（可选）', h('input', { className: 'dsh-nb-field', 'aria-label': '自动构建笔记本标题', value: researchTitle, disabled: running, placeholder: '根据研究目标命名', onChange: event => setResearchTitle(event.target.value) })) : h('p', { className: 'dsh-nb-meta' }, '将来源补充到「' + (notebook?.title || '') + '」。'),
-          h('label', null, '研究模型', h('select', { className: 'dsh-nb-field', 'aria-label': '自动构建模型', value: routeValue, disabled: running || pending.workspaceUpdate, onChange: event => { if (event.target.value) { const [provider, model] = JSON.parse(event.target.value); run('workspaceUpdate', { provider, model }) } } },
-            !hasRoute ? h('option', { value: routeValue }, '请先配置可用模型') : null,
-            ...providers.map(item => h('optgroup', { key: item.id, label: item.name || item.id }, ...(item.models || []).map(model => h('option', { key: model.id, value: JSON.stringify([item.id, model.id]) }, model.name || model.id)))))),
+          h(ModelPicker, { ...modelPickerProps, field: true, label: '自动构建模型', disabled: running }),
           h('p', { className: 'dsh-nb-meta', 'data-research-capability': state?.capabilities?.search === false ? 'unavailable' : 'available' }, state?.capabilities?.search === false ? 'DSH 当前未接入网页搜索，请先在宿主配置搜索提供方。也可以关闭此窗口，手动添加网址或本地资料。' : '使用 DSH 已接入的搜索和所选模型。网页可访问性与搜索服务状态会影响实际来源数；构建中可停止。'),
           h('div', { className: 'dsh-nb-form-actions' }, h('button', { className: 'dsh-nb-chip primary', type: 'submit', 'data-action': 'start-research', disabled: !workspace || !hasRoute || !researchPrompt.trim() || running || pending.workspaceUpdate || state?.capabilities?.search === false }, '开始检索并构建')))
       } else if (dialog === 'notebooks') {
@@ -1005,7 +1338,9 @@ window.__ModuleLoader__.load({
         dialogTitle = adding === 'note' ? '创建笔记' : '添加来源'
         const isText = adding === 'text' || adding === 'note'
         dialogContent = h('form', { className: 'dsh-nb-form', onSubmit: event => { event.preventDefault(); addSource() } },
-          adding !== 'note' ? h('div', { className: 'dsh-nb-tabs', role: 'group', 'aria-label': '来源类型' }, ['text', 'url', 'file'].map(kind => h('button', { key: kind, type: 'button', className: adding === kind ? 'on' : '', 'aria-pressed': adding === kind, onClick: () => setAdding(kind) }, kind === 'text' ? '文本' : kind === 'url' ? '网址' : '本地文本'))) : null,
+          adding !== 'note' ? h('div', { className: 'dsh-nb-tabs', role: 'group', 'aria-label': '来源类型' },
+            h(SwitchTrack, { index: SOURCE_TYPES.indexOf(adding), count: SOURCE_TYPES.length, backwards: addingDirection === 'back' }),
+            SOURCE_TYPES.map(kind => h('button', { key: kind, type: 'button', className: adding === kind ? 'on' : '', 'aria-pressed': adding === kind, onClick: () => setAdding(kind) }, kind === 'text' ? '文本' : kind === 'url' ? '网址' : '本地文本'))) : null,
           isText ? h('label', null, '名称', h('input', { className: 'dsh-nb-field', 'aria-label': '来源标题', placeholder: '名称（可选）', value: sourceTitle, onChange: event => setSourceTitle(event.target.value) })) : null,
           isText ? h('label', null, '内容', h('textarea', { className: 'dsh-nb-field dsh-nb-area', 'aria-label': '来源内容', placeholder: adding === 'note' ? '写下你的笔记' : '粘贴资料', value: draft, onChange: event => setDraft(event.target.value) })) :
             adding === 'url' ? h('label', null, '网页地址', h('input', { className: 'dsh-nb-field', 'aria-label': '来源网址', placeholder: 'https://', value: url, onChange: event => setUrl(event.target.value) })) :
@@ -1041,7 +1376,7 @@ window.__ModuleLoader__.load({
           artifact.error ? h('p', { className: 'dsh-nb-research-error', role: 'alert' }, artifact.error) : null,
           artifact.body ? h('pre', { className: 'dsh-nb-preview' }, ['study-guide', 'briefing', 'report'].includes(artifact.kind) ? h(CitationText, { text: artifact.body, sources, onOpen: viewSource }) : artifact.body) : artifact.status === 'done' ? h('p', { className: 'dsh-nb-meta' }, '内容为空。') : null) : null
       }
-      return h('div', { className: 'dsh-nb dsh-nb-workbench', 'data-workspace-id': workspace?.id || '', 'data-notebook-id': state?.notebookId || '', 'data-pane': pane, 'data-motion': ui.motion ? 'enabled' : 'static', 'data-sources-collapsed': String(ui.sourcesCollapsed), 'data-studio-collapsed': String(ui.studioCollapsed) },
+      return h('div', { className: 'dsh-nb dsh-nb-workbench', 'data-workspace-id': workspace?.id || '', 'data-notebook-id': state?.notebookId || '', 'data-pane': pane, 'data-pane-direction': paneDirection, 'data-motion': ui.motion ? 'enabled' : 'static', 'data-sources-collapsed': String(ui.sourcesCollapsed), 'data-studio-collapsed': String(ui.studioCollapsed) },
         h('header', { className: 'dsh-nb-toolbar' },
           h('span', { className: 'dsh-nb-toolbar-brand' }, h(NotebookIcon, { size: 22 })),
           h('button', { type: 'button', className: 'dsh-nb-notebook-trigger', 'aria-label': '切换或管理笔记本', 'aria-haspopup': 'dialog', onClick: () => setDialog('notebooks'), 'data-action': 'notebooks' }, h('span', null, notebook?.title || 'Notebook'), h(UiIcon, { kind: 'chevron' })),
@@ -1051,7 +1386,11 @@ window.__ModuleLoader__.load({
             menuButton('history', '会话', () => setDialog('history'), { 'aria-label': '会话历史', 'data-action': 'history' }),
             menuButton('plus', '新对话', createWorkspace, { 'aria-label': '新建对话', disabled: pending.workspaceCreate, 'data-action': 'new-workspace' }),
             iconButton('more', '更多操作', () => setDialog('more'), { 'data-action': 'more' }))),
-        h('nav', { className: 'dsh-nb-pane-tabs', 'aria-label': '工作区域' }, [['sources', '来源 ' + sources.length], ['chat', '对话'], ['studio', 'Studio']].map(([value, label]) => h('button', { key: value, type: 'button', 'aria-pressed': pane === value, 'data-pane-target': value, onClick: () => showPane(value) }, label))),
+        h('nav', { className: 'dsh-nb-pane-tabs', 'aria-label': '工作区域' },
+          h('div', { className: 'dsh-nb-pane-switch' },
+            h(SwitchTrack, { index: PANE_ORDER.indexOf(pane), count: PANE_ORDER.length, backwards: paneDirection === 'back' }),
+            PANE_ORDER.map(value => h('button', { key: value, type: 'button', 'aria-pressed': pane === value, 'data-pane-target': value, onClick: () => showPane(value) },
+              value === 'sources' ? '来源 ' + sources.length : value === 'chat' ? '对话' : 'Studio')))),
         h('div', { className: 'dsh-nb-grid' },
           h('section', { className: 'dsh-nb-col is-sources', 'aria-label': '来源' },
             h('div', { className: 'dsh-nb-rail' }, iconButton('left', '展开来源', () => togglePanel('sourcesCollapsed'), { 'data-action': 'expand-sources' }), h('span', null, '来源'), h('span', null, selected)),
@@ -1078,25 +1417,33 @@ window.__ModuleLoader__.load({
             h('form', { className: 'dsh-nb-composer', onSubmit: event => { event.preventDefault(); if (canSend) ask(question) } },
               h('textarea', { rows: 2, ref: composerRef, 'aria-label': '发送给模型的消息', placeholder: !hasRoute ? '选择可用模型后开始…' : mode === 'sources' ? '向这些资料提问…' : '描述研究目标，或提供网址和资料路径…', value: question, onChange: event => setQuestion(event.target.value), onKeyDown: event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && !event.nativeEvent?.isComposing && event.keyCode !== 229) { event.preventDefault(); if (canSend) ask(question) } } }),
               h('div', { className: 'dsh-nb-composer-bottom' },
-                h('div', { className: 'dsh-nb-mode', role: 'group', 'aria-label': '工作模式' }, ['sources', 'research'].map(value => h('button', { key: value, type: 'button', className: mode === value ? 'on' : '', disabled: !workspace || running, 'aria-pressed': mode === value, onClick: () => run('workspaceUpdate', { mode: value }), 'data-mode': value }, value === 'sources' ? '资料问答' : '搜集构建'))),
+                h('div', { className: 'dsh-nb-mode', role: 'group', 'aria-label': '工作模式' },
+                  h(SwitchTrack, { index: mode === 'sources' ? 0 : 1, count: 2, backwards: mode === 'sources' }),
+                  ['sources', 'research'].map(value => h('button', { key: value, type: 'button', className: mode === value ? 'on' : '', disabled: !workspace || running, 'aria-pressed': mode === value, onClick: () => chooseMode(value), 'data-mode': value }, value === 'sources' ? '资料问答' : '搜集构建'))),
                 h('div', { className: 'dsh-nb-composer-trailing' },
-                  h('div', { className: 'dsh-nb-model' }, h('select', { className: 'dsh-nb-model-select', 'aria-label': '对话模型', title: provider && selectedModel ? (provider.name || provider.id) + ' · ' + (selectedModel.name || selectedModel.id) : '选择模型', value: routeValue, disabled: !workspace || running, onChange: event => { if (!event.target.value) return; const [provider, model] = JSON.parse(event.target.value); run('workspaceUpdate', { provider, model }) } },
-                    !routeValue ? h('option', { value: '' }, '无可用模型') : !hasRoute ? h('option', { value: routeValue }, modelId + '（暂不可用）') : null,
-                    ...providers.map(item => h('optgroup', { key: item.id, label: item.name || item.id, disabled: !item.models?.length }, ...(item.models ?? []).map(model => h('option', { key: model.id, value: JSON.stringify([item.id, model.id]) }, model.name || model.id)))))),
+                  h(ModelPicker, { ...modelPickerProps, label: '对话模型', disabled: !workspace || running }),
                   running ? chip('停止', () => run('cancel'), { className: 'dsh-nb-chip dsh-nb-stop', disabled: pending.cancel, 'data-action': 'stop' }) : h('button', { className: 'dsh-nb-send', type: 'submit', disabled: !canSend, 'aria-label': '发送' }, h(UiIcon, { kind: 'send' }))))),
             h('div', { className: 'dsh-nb-composer-hint' }, h('span', null, mode === 'sources' ? selected ? '仅依据勾选来源' : '请先勾选可用来源' : '可搜索网页、读取资料与创建笔记本'), h('span', null, 'Shift + Enter 换行'))),
           h('section', { className: 'dsh-nb-col is-studio', 'aria-label': 'Studio' },
             h('div', { className: 'dsh-nb-rail' }, iconButton('right', '展开 Studio', () => togglePanel('studioCollapsed'), { 'data-action': 'expand-studio' }), h('span', null, 'Studio')),
             h('div', { className: 'dsh-nb-head' }, h('span', { className: 'dsh-nb-title' }, 'Studio'), iconButton('right', '收起 Studio', () => togglePanel('studioCollapsed'), { className: 'dsh-nb-icon-button dsh-nb-collapse', 'data-action': 'collapse-studio' })),
-            h('div', { className: 'dsh-nb-studio' },
+            h('div', { className: 'dsh-nb-studio' }, h('div', { className: 'dsh-nb-studio-content' },
               h('div', { className: 'dsh-nb-studio-grid' }, STUDIO.map(([kind, label, description]) => {
                 const busy = Boolean(pending['generate:' + kind]) || artifacts.some(item => item.kind === kind && pendingArtifact(item))
-                return h('button', { key: kind, className: 'dsh-nb-card' + (busy ? ' is-busy' : ''), type: 'button', title: description, disabled: !notebook || !selected || !hasRoute || busy || running, onClick: async () => { const result = await run('generate', { kind, prompt: question, provider: providerId, model: modelId }, 'generate:' + kind); if (result?.artifactId) { setArtifactId(result.artifactId); setArtifact(null); setDialog('artifact') } } }, h(StudioGlyph, { kind }), h('strong', null, label))
+                const guide = kind === 'study-guide'
+                return h('button', {
+                  key: kind, type: 'button', className: guide ? 'dsh-nb-card dsh-nb-guide-card' : 'dsh-nb-card',
+                  'data-studio-kind': kind, 'aria-busy': busy, title: description, disabled: !notebook || !selected || !hasRoute || busy || running,
+                  onClick: async () => {
+                    const result = await run('generate', { kind, prompt: question, provider: providerId, model: modelId }, 'generate:' + kind)
+                    if (result?.artifactId) { setArtifactId(result.artifactId); setArtifact(null); setDialog('artifact') }
+                  },
+                }, guide ? h('span', { className: 'dsh-nb-guide-art', 'aria-hidden': 'true' }, h('span', { className: 'dsh-nb-guide-sheet' })) : h(StudioGlyph, { kind }), h('strong', null, label), guide ? h('small', null, description) : null)
               })),
               !notebook || !selected ? h('p', { className: 'dsh-nb-meta' }, '勾选来源后即可生成内容。') : !hasRoute ? h('p', { className: 'dsh-nb-meta' }, '选择模型后即可生成内容。') : null,
-              h('div', { className: 'dsh-nb-art-heading' }, '已生成 · ' + artifacts.length),
-              artifacts.map(item => h('button', { key: item.id, className: 'dsh-nb-art', type: 'button', 'data-artifact-id': item.id, onClick: () => { setArtifactId(item.id); setArtifact(null); setStudyReturnId(''); setDialog('artifact') } }, h(StudioGlyph, { kind: item.kind }), h('span', { className: 'dsh-nb-art-copy' }, h('strong', null, artifactLabel(item)), h('small', null, [artifactStatus(item.status), (item.created_at || item.createdAt) && new Date(item.created_at || item.createdAt).toLocaleDateString()].filter(Boolean).join(' · '))))),
-              !artifacts.length ? h('p', { className: 'dsh-nb-meta' }, '生成的内容会保存在这里。') : null))),
+              h('h3', { className: 'dsh-nb-art-heading' }, '已生成', h('small', null, String(artifacts.length))),
+              artifacts.map(item => h('button', { key: item.id, className: 'dsh-nb-art', type: 'button', 'data-artifact-id': item.id, 'data-studio-kind': item.kind, onClick: () => { setArtifactId(item.id); setArtifact(null); setStudyReturnId(''); setDialog('artifact') } }, h(StudioGlyph, { kind: item.kind }), h('span', { className: 'dsh-nb-art-copy' }, h('strong', null, artifactLabel(item)), h('small', null, [artifactStatus(item.status), (item.created_at || item.createdAt) && new Date(item.created_at || item.createdAt).toLocaleDateString()].filter(Boolean).join(' · '))), h('span', { className: 'dsh-nb-art-open', 'aria-hidden': 'true' }, h(UiIcon, { kind: 'chevron', size: 14 })))),
+              !artifacts.length ? h('p', { className: 'dsh-nb-meta' }, '生成的内容会保存在这里。') : null)))),
         dialog ? h(Dialog, { key: dialog, title: dialogTitle, onClose: closeDialog, content: dialogContent, error: error || taskError, busy: dialogBusy, motion: ui.motion, onStop: running ? () => run('cancel') : undefined, stopping: pending.cancel }) : null)
     }
 
