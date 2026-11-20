@@ -10,7 +10,7 @@ export function createPreviewServer() {
     try {
       const path = decodeURIComponent(new URL(request.url, 'http://localhost').pathname)
       // The standalone fixture may be mounted at / or /dev/preview.html.
-      const packageAsset = path.match(/^\/(?:dev\/)?plugins\/dsh-notebook\/assets\/([\w.-]+\.webp)$/)
+      const packageAsset = path.match(/^\/(?:dev\/)?plugins\/@lks347\/dsh-notebook\/assets\/([\w.-]+\.webp)$/)
       const file = packageAsset ? resolve(root, 'lib/assets', packageAsset[1]) : resolve(root, '.' + (path === '/' ? '/dev/preview.html' : path))
       if (!file.startsWith(root + sep) || path.split('/').some(part => part.startsWith('.')) || (!packageAsset && !['/dev/', '/src/'].some(prefix => path === '/' || path.startsWith(prefix)))) {
         response.writeHead(404); response.end('Not found'); return
